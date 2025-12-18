@@ -121,6 +121,25 @@ compile_mrchroot() {
     fi
 }
 
+# ==================== 获取文件大小 (兼容 FreeBSD 和 Linux) ====================
+get_file_size() {
+    local file="$1"
+    local size=0
+    
+    if [ -f "$file" ]; then
+        # FreeBSD: stat -f %z
+        # Linux: stat -c %s
+        # 或者使用 wc -c
+        size=$(stat -f '%z' "$file" 2>/dev/null) || \
+        size=$(stat -c '%s' "$file" 2>/dev/null) || \
+        size=$(wc -c < "$file" 2>/dev/null | tr -d ' ') || \
+        size=$(ls -l "$file" 2>/dev/null | awk '{print $5}') || \
+        size=0
+    fi
+    
+    echo "$size"
+}
+
 # ==================== 下载 FreeBSD Base ====================
 download_freebsd_base() {
     echo -e "${Info} 下载 FreeBSD $FREEBSD_VERSION base 系统..."
@@ -130,18 +149,21 @@ download_freebsd_base() {
     local base_url="https://download.freebsd.org/releases/${ARCH}/${FREEBSD_VERSION}/base.txz"
     local lib32_url="https://download.freebsd.org/releases/${ARCH}/${FREEBSD_VERSION}/lib32.txz"
     
-    # 检查 base.txz 是否存在且完整 (应该大于 150MB)
-    local min_size=150000000  # 150MB
+    # 检查 base.txz 是否存在且完整 (应该大于 150MB = 150000000 bytes)
+    local min_size=150000000
     local need_download=false
     
     if [ -f "base.txz" ]; then
-        local file_size=$(stat -f%z "base.txz" 2>/dev/null || stat -c%s "base.txz" 2>/dev/null || echo "0")
-        if [ "$file_size" -lt "$min_size" ]; then
-            echo -e "${Warning} base.txz 文件不完整 (${file_size} bytes)，将重新下载..."
+        local file_size=$(get_file_size "base.txz")
+        echo -e "${Info} 现有 base.txz 大小: ${file_size} bytes"
+        
+        if [ "$file_size" -lt "$min_size" ] 2>/dev/null; then
+            echo -e "${Warning} base.txz 文件不完整 (${file_size} bytes < ${min_size} bytes)，将重新下载..."
             rm -f base.txz
             need_download=true
         else
-            echo -e "${Info} base.txz 已存在且完整 ($(($file_size / 1024 / 1024))MB)，跳过下载"
+            local size_mb=$((file_size / 1024 / 1024))
+            echo -e "${Info} base.txz 已存在且完整 (${size_mb}MB)，跳过下载"
         fi
     else
         need_download=true
@@ -150,12 +172,17 @@ download_freebsd_base() {
     # 下载 base.txz
     if [ "$need_download" = true ]; then
         echo -e "${Info} 下载 base.txz (约 180MB，请耐心等待)..."
-        if command -v curl &>/dev/null; then
+        
+        # 优先使用 fetch (FreeBSD 自带)
+        if command -v fetch &>/dev/null; then
+            fetch -o base.txz "$base_url"
+        elif command -v curl &>/dev/null; then
             curl -L -# "$base_url" -o base.txz
         elif command -v wget &>/dev/null; then
             wget --progress=bar:force "$base_url" -O base.txz
-        elif command -v fetch &>/dev/null; then
-            fetch "$base_url" -o base.txz
+        else
+            echo -e "${Error} 没有可用的下载工具 (fetch/curl/wget)"
+            return 1
         fi
         
         if [ $? -ne 0 ] || [ ! -f "base.txz" ]; then
@@ -164,28 +191,36 @@ download_freebsd_base() {
         fi
         
         # 验证下载的文件
-        local file_size=$(stat -f%z "base.txz" 2>/dev/null || stat -c%s "base.txz" 2>/dev/null || echo "0")
-        if [ "$file_size" -lt "$min_size" ]; then
-            echo -e "${Error} base.txz 下载不完整，请检查网络后重试"
-            rm -f base.txz
+        local file_size=$(get_file_size "base.txz")
+        echo -e "${Info} 下载完成，文件大小: ${file_size} bytes"
+        
+        if [ "$file_size" -lt "$min_size" ] 2>/dev/null; then
+            echo -e "${Error} base.txz 下载不完整 (${file_size} bytes < ${min_size} bytes)"
+            echo -e "${Tip} 请检查网络连接后重试，或手动下载:"
+            echo -e "${Tip} $base_url"
+            # 不删除文件，保留供检查
             return 1
         fi
-        echo -e "${Info} base.txz 下载成功 ($(($file_size / 1024 / 1024))MB)"
+        
+        local size_mb=$((file_size / 1024 / 1024))
+        echo -e "${Info} base.txz 下载成功 (${size_mb}MB)"
     fi
     
     # 下载 lib32.txz (可选，用于 gdb 等)
     if [ "$ARCH" = "amd64" ]; then
         local lib32_min_size=50000000  # 50MB
         if [ -f "lib32.txz" ]; then
-            local lib32_size=$(stat -f%z "lib32.txz" 2>/dev/null || stat -c%s "lib32.txz" 2>/dev/null || echo "0")
-            if [ "$lib32_size" -lt "$lib32_min_size" ]; then
+            local lib32_size=$(get_file_size "lib32.txz")
+            if [ "$lib32_size" -lt "$lib32_min_size" ] 2>/dev/null; then
                 rm -f lib32.txz
             fi
         fi
         
         if [ ! -f "lib32.txz" ]; then
             echo -e "${Info} 下载 lib32.txz (可选)..."
-            if command -v curl &>/dev/null; then
+            if command -v fetch &>/dev/null; then
+                fetch -o lib32.txz "$lib32_url" 2>/dev/null || true
+            elif command -v curl &>/dev/null; then
                 curl -L -# "$lib32_url" -o lib32.txz 2>/dev/null || true
             fi
         fi
