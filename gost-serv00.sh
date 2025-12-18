@@ -804,8 +804,11 @@ add_relay_config() {
     fi
     
     # 端口配置 - 使用 devil 端口管理
+    # 注意: Serv00 版本只支持 TCP 中转，所以强制使用 TCP 端口
+    local_port_type="tcp"  # 强制 TCP
+    
     echo -e ""
-    echo -e "${Info} 端口配置:"
+    echo -e "${Info} 端口配置 (Serv00 只支持 TCP 中转):"
     echo -e "[1] 随机端口 + 自动添加 Devil 端口"
     echo -e "[2] 手动指定端口"
     read -p "请选择 [默认1]: " port_mode
@@ -813,7 +816,7 @@ add_relay_config() {
     
     case $port_mode in
         1)
-            local_port=$(get_random_devil_port "$port_type" "gost-relay" 10000 65000)
+            local_port=$(get_random_devil_port "$local_port_type" "gost-relay" 10000 65000)
             if [ -z "$local_port" ]; then
                 echo -e "${Error} 获取端口失败"
                 return 1
@@ -825,7 +828,7 @@ add_relay_config() {
             if ! check_port $local_port; then
                 echo -e "${Warning} 端口可能已被占用"
             fi
-            add_devil_port "$local_port" "$port_type" "gost-relay"
+            add_devil_port "$local_port" "$local_port_type" "gost-relay"
             ;;
         *)
             echo -e "${Error} 无效选择"
