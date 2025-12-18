@@ -149,80 +149,38 @@ download_freebsd_base() {
     local base_url="https://download.freebsd.org/releases/${ARCH}/${FREEBSD_VERSION}/base.txz"
     local lib32_url="https://download.freebsd.org/releases/${ARCH}/${FREEBSD_VERSION}/lib32.txz"
     
-    # 检查 base.txz 是否存在且完整 (应该大于 150MB = 150000000 bytes)
-    local min_size=150000000
-    local need_download=false
-    
-    if [ -f "base.txz" ]; then
-        local file_size=$(get_file_size "base.txz")
-        echo -e "${Info} 现有 base.txz 大小: ${file_size} bytes"
-        
-        if [ "$file_size" -lt "$min_size" ] 2>/dev/null; then
-            echo -e "${Warning} base.txz 文件不完整 (${file_size} bytes < ${min_size} bytes)，将重新下载..."
-            rm -f base.txz
-            need_download=true
-        else
-            local size_mb=$((file_size / 1024 / 1024))
-            echo -e "${Info} base.txz 已存在且完整 (${size_mb}MB)，跳过下载"
-        fi
-    else
-        need_download=true
-    fi
-    
     # 下载 base.txz
-    if [ "$need_download" = true ]; then
+    if [ ! -f "base.txz" ]; then
         echo -e "${Info} 下载 base.txz (约 180MB，请耐心等待)..."
         
-        # 优先使用 fetch (FreeBSD 自带)
-        if command -v fetch &>/dev/null; then
-            fetch -o base.txz "$base_url"
+        # 优先使用 wget (更可靠)
+        if command -v wget &>/dev/null; then
+            wget "$base_url"
+        elif command -v fetch &>/dev/null; then
+            fetch "$base_url"
         elif command -v curl &>/dev/null; then
-            curl -L -# "$base_url" -o base.txz
-        elif command -v wget &>/dev/null; then
-            wget --progress=bar:force "$base_url" -O base.txz
+            curl -L -O "$base_url"
         else
-            echo -e "${Error} 没有可用的下载工具 (fetch/curl/wget)"
+            echo -e "${Error} 没有可用的下载工具 (wget/fetch/curl)"
             return 1
         fi
         
-        if [ $? -ne 0 ] || [ ! -f "base.txz" ]; then
+        if [ ! -f "base.txz" ]; then
             echo -e "${Error} base.txz 下载失败"
             return 1
         fi
-        
-        # 验证下载的文件
-        local file_size=$(get_file_size "base.txz")
-        echo -e "${Info} 下载完成，文件大小: ${file_size} bytes"
-        
-        if [ "$file_size" -lt "$min_size" ] 2>/dev/null; then
-            echo -e "${Error} base.txz 下载不完整 (${file_size} bytes < ${min_size} bytes)"
-            echo -e "${Tip} 请检查网络连接后重试，或手动下载:"
-            echo -e "${Tip} $base_url"
-            # 不删除文件，保留供检查
-            return 1
-        fi
-        
-        local size_mb=$((file_size / 1024 / 1024))
-        echo -e "${Info} base.txz 下载成功 (${size_mb}MB)"
+        echo -e "${Info} base.txz 下载完成"
+    else
+        echo -e "${Info} base.txz 已存在，跳过下载"
     fi
     
     # 下载 lib32.txz (可选，用于 gdb 等)
-    if [ "$ARCH" = "amd64" ]; then
-        local lib32_min_size=50000000  # 50MB
-        if [ -f "lib32.txz" ]; then
-            local lib32_size=$(get_file_size "lib32.txz")
-            if [ "$lib32_size" -lt "$lib32_min_size" ] 2>/dev/null; then
-                rm -f lib32.txz
-            fi
-        fi
-        
-        if [ ! -f "lib32.txz" ]; then
-            echo -e "${Info} 下载 lib32.txz (可选)..."
-            if command -v fetch &>/dev/null; then
-                fetch -o lib32.txz "$lib32_url" 2>/dev/null || true
-            elif command -v curl &>/dev/null; then
-                curl -L -# "$lib32_url" -o lib32.txz 2>/dev/null || true
-            fi
+    if [ "$ARCH" = "amd64" ] && [ ! -f "lib32.txz" ]; then
+        echo -e "${Info} 下载 lib32.txz (可选)..."
+        if command -v wget &>/dev/null; then
+            wget "$lib32_url" 2>/dev/null || true
+        elif command -v fetch &>/dev/null; then
+            fetch "$lib32_url" 2>/dev/null || true
         fi
     fi
     
@@ -230,6 +188,7 @@ download_freebsd_base() {
 }
 
 # ==================== 设置 chroot 环境 ====================
+# 参考 serv00-play 项目的实现方式
 setup_chroot() {
     echo -e "${Info} 设置 chroot 环境..."
     
@@ -244,58 +203,31 @@ setup_chroot() {
     # 创建 chroot 目录
     mkdir -p "$CHROOT_DIR"
     
-    # 验证 base.txz 是否为有效的压缩文件
-    echo -e "${Info} 验证 base.txz 文件..."
-    if ! xz -t base.txz 2>/dev/null && ! file base.txz | grep -q "XZ\|xz"; then
-        echo -e "${Error} base.txz 文件损坏或格式不正确"
-        echo -e "${Tip} 请删除 base.txz 并重新运行脚本下载"
-        return 1
-    fi
-    
-    # 方式1: 尝试使用 mrchroot -t 直接解压 (处理权限)
+    # 直接使用 tar 解压 base.txz 到 chroot 目录 (关键步骤!)
     echo -e "${Info} 解压 base.txz 到 chroot 环境 (这可能需要几分钟)..."
-    if ./mrchroot -t base.txz "$CHROOT_DIR" 2>/dev/null; then
-        echo -e "${Info} 使用 mrchroot 解压成功"
-    else
-        # 方式2: 使用 tar 直接解压
-        echo -e "${Warning} mrchroot 解压失败，尝试使用 tar 直接解压..."
-        
-        # 使用 tar 解压 xz 压缩的文件
-        if tar -xJf base.txz -C "$CHROOT_DIR" 2>/dev/null; then
-            echo -e "${Info} 使用 tar -xJf 解压成功"
-        elif tar -xf base.txz -C "$CHROOT_DIR" 2>/dev/null; then
-            echo -e "${Info} 使用 tar -xf 解压成功"
-        elif xz -dk base.txz 2>/dev/null && tar -xf base.tar -C "$CHROOT_DIR" 2>/dev/null; then
-            echo -e "${Info} 使用 xz + tar 解压成功"
-            rm -f base.tar
-        else
-            echo -e "${Error} 所有解压方式都失败了"
-            echo -e "${Tip} 请手动解压: tar -xJf base.txz -C $CHROOT_DIR"
-            return 1
-        fi
-        
-        # 使用 mrchroot 更新权限数据库
-        echo -e "${Info} 更新权限数据库..."
-        ./mrchroot "$CHROOT_DIR" /bin/true 2>/dev/null || true
-    fi
+    cd "$CHROOT_DIR"
+    tar xvf ../base.txz
     
-    # 检查解压是否成功
-    if [ ! -d "$CHROOT_DIR/bin" ] || [ ! -d "$CHROOT_DIR/usr" ]; then
-        echo -e "${Error} chroot 环境不完整，解压可能失败"
+    if [ $? -ne 0 ]; then
+        echo -e "${Error} base.txz 解压失败"
         return 1
     fi
+    
+    # 验证解压结果
+    if [ ! -d "$CHROOT_DIR/bin" ] || [ ! -d "$CHROOT_DIR/usr" ]; then
+        echo -e "${Error} chroot 环境不完整"
+        return 1
+    fi
+    
+    echo -e "${Info} base.txz 解压成功"
     
     # 解压 lib32.txz (如果存在)
-    if [ -f "lib32.txz" ]; then
+    if [ -f "../lib32.txz" ]; then
         echo -e "${Info} 解压 lib32.txz..."
-        if ./mrchroot -t lib32.txz "$CHROOT_DIR" 2>/dev/null; then
-            echo -e "${Info} lib32.txz 解压成功"
-        else
-            tar -xJf lib32.txz -C "$CHROOT_DIR" 2>/dev/null || \
-            tar -xf lib32.txz -C "$CHROOT_DIR" 2>/dev/null || \
-            echo -e "${Warning} lib32.txz 解压失败，跳过"
-        fi
+        tar xvf ../lib32.txz || echo -e "${Warning} lib32.txz 解压失败，跳过"
     fi
+    
+    cd "$MRCHROOT_DIR"
     
     # 复制 resolv.conf 用于网络
     if [ -f /etc/resolv.conf ] && [ -d "$CHROOT_DIR/etc" ]; then
@@ -311,7 +243,7 @@ setup_chroot() {
     touch "$CHROOT_DIR/root/.mrchroot_env"
     
     echo -e "${Info} chroot 环境设置完成"
-    echo -e "${Info} chroot 目录大小: $(du -sh "$CHROOT_DIR" 2>/dev/null | cut -f1)"
+    echo -e "${Info} chroot 目录: $CHROOT_DIR"
 }
 
 # ==================== 安装 GostXray 到 chroot ====================
