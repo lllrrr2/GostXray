@@ -17,7 +17,7 @@ USER_HOME="$HOME"
 MRCHROOT_DIR="$USER_HOME/.mrchroot"
 CHROOT_DIR="$MRCHROOT_DIR/chroot"
 MRCHROOT_BIN="$MRCHROOT_DIR/mrchroot"
-FREEBSD_VERSION="14.1-RELEASE"
+FREEBSD_VERSION="14.3-RELEASE"
 
 # ==================== 系统检测 ====================
 check_system() {
