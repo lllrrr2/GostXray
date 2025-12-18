@@ -11,7 +11,7 @@ Error="${Red}[错误]${Reset}"
 Warning="${Yellow}[警告]${Reset}"
 Tip="${Cyan}[提示]${Reset}"
 
-shell_version="3.2.1-serv00"
+shell_version="3.3.0-serv00"
 gost_version="3.0.0"
 
 # Serv00 用户目录
@@ -418,6 +418,43 @@ detect_protocol() {
     esac
 }
 
+# 检查是否为不支持中转的协议
+check_unsupported_protocol() {
+    local link="$1"
+    local proto="$2"
+    
+    # 检查 Reality 协议
+    if [[ "$link" == *"reality"* ]] || [[ "$link" == *"pbk="* ]]; then
+        echo -e ""
+        echo -e "${Red}✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖${Reset}"
+        echo -e "${Red}  警告: 检测到 VLESS-Reality 协议!${Reset}"
+        echo -e "${Red}✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖${Reset}"
+        echo -e "${Yellow}Reality 协议无法通过 TCP 中转！${Reset}"
+        echo -e "${Yellow}原因: Reality 会验证服务器 IP，中转后 IP 变化导致验证失败${Reset}"
+        echo -e ""
+        echo -e "${Cyan}建议使用以下可中转协议:${Reset}"
+        echo -e "  ✓ VLESS + WS + TLS"
+        echo -e "  ✓ VMess + WS + TLS"
+        echo -e "  ✓ Trojan"
+        echo -e "  ✓ Shadowsocks"
+        echo -e ""
+        return 1
+    fi
+    
+    # 检查 UDP 协议
+    if [[ "$proto" == "hysteria2" ]] || [[ "$proto" == "tuic" ]]; then
+        echo -e ""
+        echo -e "${Red}✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖${Reset}"
+        echo -e "${Red}  警告: 检测到 ${proto^^} 协议!${Reset}"
+        echo -e "${Red}✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖✖${Reset}"
+        echo -e "${Yellow}${proto^^} 需要 UDP 端口，Serv00 环境无法绑定 UDP!${Reset}"
+        echo -e ""
+        return 1
+    fi
+    
+    return 0
+}
+
 parse_node() {
     local link="$1"
     local proto=$(detect_protocol "$link")
@@ -536,8 +573,10 @@ EOF
     # 添加到 PATH
     if ! grep -q ".gost" "$HOME/.profile" 2>/dev/null; then
         echo 'export PATH="$HOME/.gost:$PATH"' >> "$HOME/.profile"
-        echo -e "${Info} 已添加到 PATH，请运行: source ~/.profile"
     fi
+    
+    # 自动安装快捷命令
+    install_shortcut
 }
 
 # ==================== GOST 配置生成 ====================
@@ -734,6 +773,13 @@ add_relay_config() {
         fi
         
         echo -e "${Info} 协议: ${Green}${proto^^}${Reset}"
+        
+        # 检查是否为不支持中转的协议
+        if ! check_unsupported_protocol "$node_link" "$proto"; then
+            read -p "是否仍要继续? (很可能无法使用) [y/N]: " force_continue
+            [[ ! $force_continue =~ ^[Yy]$ ]] && return 1
+        fi
+        
         port_type=$(detect_protocol_type "$proto")
         echo -e "${Info} 端口类型: ${Green}${port_type^^}${Reset}"
         
@@ -904,10 +950,21 @@ uninstall() {
     
     stop_gost
     rm -rf "$GOST_DIR"
+    
+    # 删除快捷命令
+    if [ -f "$SCRIPT_PATH" ]; then
+        rm -f "$SCRIPT_PATH"
+        echo -e "${Info} 已删除快捷命令 $SCRIPT_PATH"
+    fi
+    
+    # 清理 PATH
     sed -i '/\.gost/d' "$HOME/.profile" 2>/dev/null || \
     sed -i '' '/\.gost/d' "$HOME/.profile"
+    sed -i '/HOME\/bin/d' "$HOME/.profile" 2>/dev/null || \
+    sed -i '' '/HOME\/bin/d' "$HOME/.profile"
     
     echo -e "${Info} 已卸载"
+    echo -e "${Tip} 如需完全清理，请删除脚本文件"
 }
 
 # ==================== 状态显示 ====================
@@ -935,7 +992,7 @@ show_menu() {
 ${Green}========================================================${Reset}
    GOST v3 中转脚本 - Serv00/HostUno 版 ${Red}[${shell_version}]${Reset}
 ${Green}========================================================${Reset}
- ${Cyan}支持: VLESS VMess Trojan SS Hy2 TUIC SOCKS${Reset}
+ ${Cyan}支持: VLESS VMess Trojan SS (不支持: Reality Hy2 TUIC)${Reset}
 ${Green}--------------------------------------------------------${Reset}
  ${Green}1.${Reset}  安装 GOST v3
  ${Green}2.${Reset}  卸载 GOST v3
@@ -949,12 +1006,10 @@ ${Green}--------------------------------------------------------${Reset}
  ${Green}8.${Reset}  查看当前配置
  ${Green}9.${Reset}  删除配置
 ${Green}--------------------------------------------------------${Reset}
- ${Green}10.${Reset} 安装快捷命令 (gostxray)
-${Green}--------------------------------------------------------${Reset}
  ${Green}0.${Reset}  退出
 ${Green}========================================================${Reset}
 "
-    read -p " 请选择 [0-10]: " num
+    read -p " 请选择 [0-9]: " num
     
     case "$num" in
         1) install_gost ;;
@@ -966,7 +1021,6 @@ ${Green}========================================================${Reset}
         7) add_relay_config ;;
         8) show_config ;;
         9) delete_config ;;
-        10) install_shortcut ;;
         0) exit 0 ;;
         *) echo -e "${Error} 无效选择" ;;
     esac
