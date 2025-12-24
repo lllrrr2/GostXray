@@ -1130,6 +1130,7 @@ ${Green}========================================================${Reset}
     read -p " 请选择 [0-11]: " num
     
     case "$num" in
+        0) exit 0 ;;
         1) install_gost ;;
         2) uninstall ;;
         3) start_gost ;;
@@ -1141,7 +1142,6 @@ ${Green}========================================================${Reset}
         9) show_config ;;
         10) delete_config ;;
         11) install_shortcut ;;
-        0) exit 0 ;;
         *) echo -e "${Error} 无效选择" ;;
     esac
     
