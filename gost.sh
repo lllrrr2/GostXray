@@ -99,6 +99,7 @@ check_shortcut() {
 }
 
 # ==================== 端口管理 ====================
+# ==================== 端口管理 ====================
 get_random_port() {
     local min=$1
     local max=$2
@@ -129,6 +130,39 @@ check_port_available() {
     return 0
 }
 
+open_port() {
+    local port=$1
+    if [[ -z "$port" ]]; then
+        return
+    fi
+    
+    # Check if ufw is available and active
+    if command -v ufw >/dev/null 2>&1 && systemctl is-active ufw &>/dev/null; then
+        ufw allow $port/tcp >/dev/null 2>&1
+        ufw allow $port/udp >/dev/null 2>&1
+        echo -e "${Info} 已通过 UFW 开放端口 $port"
+    
+    # Check if firewalld is available and active
+    elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active firewalld &>/dev/null; then
+        firewall-cmd --zone=public --add-port=$port/tcp --permanent >/dev/null 2>&1
+        firewall-cmd --zone=public --add-port=$port/udp --permanent >/dev/null 2>&1
+        firewall-cmd --reload >/dev/null 2>&1
+        echo -e "${Info} 已通过 FirewallD 开放端口 $port"
+        
+    # Fallback to iptables
+    elif command -v iptables >/dev/null 2>&1; then
+        iptables -I INPUT -p tcp --dport $port -j ACCEPT >/dev/null 2>&1
+        iptables -I INPUT -p udp --dport $port -j ACCEPT >/dev/null 2>&1
+        # Try to save rules if possible (distro-specific)
+        if command -v netfilter-persistent >/dev/null 2>&1; then
+            netfilter-persistent save >/dev/null 2>&1
+        elif command -v service >/dev/null 2>&1; then
+            service iptables save >/dev/null 2>&1
+        fi
+        echo -e "${Info} 已通过 IPTables 开放端口 $port"
+    fi
+}
+
 read_port_config() {
     echo -e ""
     echo -e "${Info} 端口配置选项:"
@@ -139,6 +173,12 @@ read_port_config() {
     echo -e "-----------------------------------"
     read -p "请选择 [默认1]: " port_mode
     port_mode=${port_mode:-1}
+    
+    # Validate input is a number between 1-3
+    if [[ ! "$port_mode" =~ ^[1-3]$ ]]; then
+        echo -e "${Error} 无效选择，请输入 1-3"
+        return 1
+    fi
     
     case $port_mode in
         1)
@@ -164,17 +204,21 @@ read_port_config() {
             ;;
         3)
             read -p "请输入本地监听端口: " local_port
+            # Validate port number
+            if [[ ! "$local_port" =~ ^[0-9]+$ ]] || [ "$local_port" -lt 1 ] || [ "$local_port" -gt 65535 ]; then
+                echo -e "${Error} 端口号必须在 1-65535 之间"
+                return 1
+            fi
             if ! check_port_available $local_port; then
                 echo -e "${Warning} 端口 $local_port 已被占用"
                 read -p "是否继续使用? [y/N]: " confirm
                 [[ ! $confirm =~ ^[Yy]$ ]] && return 1
             fi
             ;;
-        *)
-            echo -e "${Error} 无效选择"
-            return 1
-            ;;
     esac
+    
+    # 开放端口防火墙
+    open_port "$local_port"
     
     # 记录使用的端口
     mkdir -p /etc/gost3
@@ -868,10 +912,11 @@ add_relay_config() {
         echo -e ""
         echo -e "${Info} 请粘贴节点链接 (支持批量多行粘贴): "
         
-        # Read multiline input
+        # Read multiline input with sufficient timeout
         read -r first_link
         [ -n "$first_link" ] && node_links+=("$first_link")
-        while read -r -t 0.05 line; do
+        # Increased timeout to 0.5s to ensure all pasted lines are captured
+        while read -r -t 0.5 line; do
             [ -n "$line" ] && node_links+=("$line")
         done
         
@@ -1234,32 +1279,53 @@ show_status() {
 # ==================== 解析测试 ====================
 test_parse() {
     echo -e ""
-    read -p "请粘贴节点链接: " test_link
+    echo -e "${Info} 请粘贴节点链接 (支持批量多行粘贴): "
     
-    if [ -z "$test_link" ]; then
+    # Read multiline input with sufficient timeout
+    local test_links=()
+    read -r first_link
+    [ -n "$first_link" ] && test_links+=("$first_link")
+    while read -r -t 0.5 line; do
+        [ -n "$line" ] && test_links+=("$line")
+    done
+    
+    if [ ${#test_links[@]} -eq 0 ]; then
         echo -e "${Error} 链接不能为空"
         return
     fi
     
-    local protocol=$(detect_protocol "$test_link")
+    echo -e "${Info} 共获取到 ${#test_links[@]} 个链接"
     echo -e ""
-    echo -e "${Info} 协议类型: ${Green_font_prefix}${protocol^^}${Font_color_suffix}"
     
-    if [ "$protocol" == "unknown" ]; then
-        echo -e "${Error} 无法识别的协议"
-        return
-    fi
+    local index=1
+    for test_link in "${test_links[@]}"; do
+        if [ ${#test_links[@]} -gt 1 ]; then
+            echo -e "${Info} ========== [${index}/${#test_links[@]}] =========="
+        fi
+        
+        local protocol=$(detect_protocol "$test_link")
+        echo -e "${Info} 协议类型: ${Green_font_prefix}${protocol^^}${Font_color_suffix}"
+        
+        if [ "$protocol" == "unknown" ]; then
+            echo -e "${Error} 无法识别的协议"
+            echo -e ""
+            ((index++))
+            continue
+        fi
+        
+        local parsed=$(parse_node_link "$test_link")
+        echo -e "${Info} 解析结果:"
+        echo -e "${Cyan_font_prefix}${parsed}${Font_color_suffix}"
+        
+        local target_info=$(get_target_from_parsed "$protocol" "$parsed")
+        IFS='|' read -r target_host target_port <<< "$target_info"
+        echo -e ""
+        echo -e "${Info} 目标地址: ${Green_font_prefix}${target_host}:${target_port}${Font_color_suffix}"
+        echo -e ""
+        
+        ((index++))
+    done
     
-    local parsed=$(parse_node_link "$test_link")
-    echo -e "${Info} 解析结果:"
-    echo -e "${Cyan_font_prefix}${parsed}${Font_color_suffix}"
-    
-    local target_info=$(get_target_from_parsed "$protocol" "$parsed")
-    IFS='|' read -r target_host target_port <<< "$target_info"
-    echo -e ""
-    echo -e "${Info} 目标地址: ${Green_font_prefix}${target_host}:${target_port}${Font_color_suffix}"
-    
-    echo -e ""
     read -p "按回车键继续..."
 }
 
