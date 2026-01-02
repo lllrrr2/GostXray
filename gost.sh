@@ -250,6 +250,8 @@ url_decode() {
 # ==================== 协议解析函数 ====================
 parse_vless() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#vless://}"
     
     local user_host="${link%%\?*}"
@@ -264,12 +266,12 @@ parse_vless() {
     # 解析参数
     local type="" security="" sni="" path="" flow="" host_param="" fp="" pbk="" sid=""
     while IFS='=' read -r key value; do
-        value=$(url_decode "$value")
+        value="${value%%#*}"  # 移除 fragment
         case $key in
             type) type="$value" ;;
             security) security="$value" ;;
             sni) sni="$value" ;;
-            path) path="$value" ;;
+            path) path="$(echo -e "${value//%/\\x}")" ;;  # URL解码 path
             flow) flow="$value" ;;
             host) host_param="$value" ;;
             fp) fp="$value" ;;
@@ -283,6 +285,8 @@ parse_vless() {
 
 parse_vmess() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#vmess://}"
     local decoded=$(base64_decode "$link")
     
@@ -307,6 +311,8 @@ parse_vmess() {
 
 parse_trojan() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#trojan://}"
     
     local pass_host="${link%%\?*}"
@@ -320,7 +326,7 @@ parse_trojan() {
     
     local sni="" type="" host_param="" path=""
     while IFS='=' read -r key value; do
-        value=$(url_decode "$value")
+        value="${value%%#*}"  # 移除 fragment
         case $key in
             sni) sni="$value" ;;
             type) type="$value" ;;
@@ -334,6 +340,8 @@ parse_trojan() {
 
 parse_ss() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#ss://}"
     
     local method="" password="" host="" port=""
@@ -363,6 +371,8 @@ parse_ss() {
 
 parse_hysteria2() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#hysteria2://}"
     link="${link#hy2://}"
     
@@ -377,7 +387,7 @@ parse_hysteria2() {
     
     local sni="" insecure="" obfs="" obfs_password=""
     while IFS='=' read -r key value; do
-        value=$(url_decode "$value")
+        value="${value%%#*}"  # 移除 fragment
         case $key in
             sni) sni="$value" ;;
             insecure) insecure="$value" ;;
@@ -391,6 +401,8 @@ parse_hysteria2() {
 
 parse_tuic() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#tuic://}"
     
     local auth="${link%%@*}"
@@ -404,13 +416,16 @@ parse_tuic() {
     port="${port%%#*}"
     
     local params="${rest#*\?}"
-    local sni="" alpn="" congestion_control=""
+    local sni="" alpn="" congestion_control="" udp_relay_mode="" allow_insecure=""
     while IFS='=' read -r key value; do
-        value=$(url_decode "$value")
+        # 简化处理，不使用 url_decode 避免可能的问题
+        value="${value%%#*}"  # 移除 fragment
         case $key in
             sni) sni="$value" ;;
             alpn) alpn="$value" ;;
             congestion_control) congestion_control="$value" ;;
+            udp_relay_mode) udp_relay_mode="$value" ;;
+            allow_insecure) allow_insecure="$value" ;;
         esac
     done <<< "$(echo "$params" | tr '&' '\n' | cut -d'#' -f1)"
     
@@ -419,6 +434,8 @@ parse_tuic() {
 
 parse_socks() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#socks://}"
     link="${link#socks5://}"
     
@@ -443,6 +460,8 @@ parse_socks() {
 
 parse_http() {
     local link="$1"
+    # 清理链接中可能的回车符和空格
+    link=$(echo "$link" | tr -d '\r' | xargs)
     link="${link#http://}"
     link="${link#https://}"
     
@@ -468,6 +487,8 @@ parse_http() {
 # ==================== 自动识别协议 ====================
 detect_protocol() {
     local link="$1"
+    # 清理回车符和空白字符
+    link=$(echo "$link" | tr -d '\r\n' | xargs)
     
     case "$link" in
         vless://*) echo "vless" ;;
