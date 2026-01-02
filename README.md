@@ -24,7 +24,7 @@
 
 ```bash
 # 下载脚本
-wget -O gost.sh https://raw.githubusercontent.com/hxzlplp7/easygostv3/main/Multi-EasyGost-2/gost.sh
+wget -O gost.sh https://raw.githubusercontent.com/hxzlplp7/easygostv3/main/gost.sh
 
 # 运行
 chmod +x gost.sh && ./gost.sh
@@ -34,7 +34,7 @@ chmod +x gost.sh && ./gost.sh
 
 ```bash
 # 下载脚本
-curl -sL https://raw.githubusercontent.com/hxzlplp7/easygostv3/main/Multi-EasyGost-2/gost-serv00.sh -o gost.sh
+curl -sL https://raw.githubusercontent.com/hxzlplp7/easygostv3/main/gost-serv00.sh -o gost.sh
 
 # 运行
 chmod +x gost.sh && ./gost.sh
