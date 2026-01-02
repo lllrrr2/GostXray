@@ -954,8 +954,10 @@ add_relay_config() {
             [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
         done
         
-        # 使用正则一次性提取所有链接（仅匹配ASCII可视字符，排除中文等）
-        local regex="(vless://[!-~]+|vmess://[!-~]+|trojan://[!-~]+|ss://[!-~]+|hysteria2://[!-~]+|hy2://[!-~]+|tuic://[!-~]+|socks://[!-~]+|socks5://[!-~]+|http://[!-~]+|https://[!-~]+)"
+        # 使用正则一次性提取所有链接（显式白名单，确保兼容性并排除中文）
+        # 字符类包括：字母数字、unreserved (-._~)、reserved (:/?#[]@!$&'()*+,;=)、百分号 (%)
+        # 注意：在 [] 中，] 需放首位，- 放末位
+        local regex="(vless|vmess|trojan|ss|hysteria2|hy2|tuic|socks|socks5|http|https)://[][a-zA-Z0-9._~:/?#@!$&'()*+,;=%-]+"
         while IFS= read -r -d '' link; do
             # 再次清理可能残留的非URL字符
             link=$(echo "$link" | tr -cd '[:print:]')
@@ -1357,8 +1359,8 @@ test_parse() {
         [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
     done
     
-    # 使用正则一次性提取所有链接（仅匹配ASCII可视字符）
-    local regex="(vless://[!-~]+|vmess://[!-~]+|trojan://[!-~]+|ss://[!-~]+|hysteria2://[!-~]+|hy2://[!-~]+|tuic://[!-~]+|socks://[!-~]+|socks5://[!-~]+|http://[!-~]+|https://[!-~]+)"
+    # 使用正则一次性提取所有链接（显式白名单）
+    local regex="(vless|vmess|trojan|ss|hysteria2|hy2|tuic|socks|socks5|http|https)://[][a-zA-Z0-9._~:/?#@!$&'()*+,;=%-]+"
     
     while IFS= read -r -d '' link; do
         test_links+=("$link")
