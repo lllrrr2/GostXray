@@ -954,9 +954,11 @@ add_relay_config() {
             [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
         done
         
-        # 使用正则一次性提取所有链接（协议前缀 + 非空白字符）
-        local regex="(vless://[^[:space:]]+|vmess://[^[:space:]]+|trojan://[^[:space:]]+|ss://[^[:space:]]+|hysteria2://[^[:space:]]+|hy2://[^[:space:]]+|tuic://[^[:space:]]+|socks://[^[:space:]]+|socks5://[^[:space:]]+|http://[^[:space:]]+|https://[^[:space:]]+)"
+        # 使用正则一次性提取所有链接（仅匹配ASCII可视字符，排除中文等）
+        local regex="(vless://[!-~]+|vmess://[!-~]+|trojan://[!-~]+|ss://[!-~]+|hysteria2://[!-~]+|hy2://[!-~]+|tuic://[!-~]+|socks://[!-~]+|socks5://[!-~]+|http://[!-~]+|https://[!-~]+)"
         while IFS= read -r -d '' link; do
+            # 再次清理可能残留的非URL字符
+            link=$(echo "$link" | tr -cd '[:print:]')
             node_links+=("$link")
         done < <(echo "$raw_input" | grep -oE "$regex" | tr '\n' '\0')
         
@@ -966,6 +968,15 @@ add_relay_config() {
         fi
         
         echo -e "${Info} 共获取到 ${#node_links[@]} 个链接"
+        # 如果是多个链接，自动启用批量模式（随机端口）
+        if [ ${#node_links[@]} -gt 1 ]; then
+            echo -e "${Info} 检测到多个链接，将自动使用随机端口分配"
+            port_mode=1 
+            # 设置一个标志位，用于稍后跳过 read_port_config 的交互
+            auto_batch_mode=true
+        else
+            auto_batch_mode=false
+        fi
     else
         read -p "请输入目标地址 (IP或域名): " target_host
         read -p "请输入目标端口: " target_port
@@ -1019,10 +1030,26 @@ add_relay_config() {
         fi
         
         # Configure Port
-        if ! read_port_config; then
-            echo -e "${Warning} 跳过当前配置"
-            ((process_count++))
-            continue
+        # 如果是自动批量模式，直接使用随机端口逻辑，不调用 read_port_config
+        if [ "$auto_batch_mode" == "true" ]; then
+            local_port=$(get_random_port 10000 65535)
+            local retry=0
+            while ! check_port_available $local_port && [ $retry -lt 10 ]; do
+                local_port=$(get_random_port 10000 65535)
+                ((retry++))
+            done
+            echo -e "${Info} 随机分配端口: ${Green_font_prefix}$local_port${Font_color_suffix}"
+            
+            # 开放端口防火墙
+            open_port "$local_port"
+            mkdir -p /etc/gost3
+            echo "$local_port" >> $port_conf_path
+        else
+            if ! read_port_config; then
+                echo -e "${Warning} 跳过当前配置"
+                ((process_count++))
+                continue
+            fi
         fi
         
         if [ "$relay_type" == "1" ]; then
@@ -1330,26 +1357,12 @@ test_parse() {
         [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
     done
     
-    # 处理输入：按行分割，同时处理可能在一行中的多个链接
-    local protocols="vless://|vmess://|trojan://|ss://|hysteria2://|hy2://|tuic://|socks://|socks5://|http://|https://"
+    # 使用正则一次性提取所有链接（仅匹配ASCII可视字符）
+    local regex="(vless://[!-~]+|vmess://[!-~]+|trojan://[!-~]+|ss://[!-~]+|hysteria2://[!-~]+|hy2://[!-~]+|tuic://[!-~]+|socks://[!-~]+|socks5://[!-~]+|http://[!-~]+|https://[!-~]+)"
     
-    while IFS= read -r line; do
-        [ -z "$line" ] && continue
-        line=$(echo "$line" | tr -d '\r')
-        
-        local prefix_count=$(echo "$line" | grep -oE "$protocols" | wc -l)
-        
-        if [ "$prefix_count" -gt 1 ]; then
-            local split_line=$(echo "$line" | sed -E "s/(${protocols})/\n\1/g")
-            while IFS= read -r sub_link; do
-                sub_link=$(echo "$sub_link" | xargs)
-                [ -n "$sub_link" ] && test_links+=("$sub_link")
-            done <<< "$split_line"
-        else
-            line=$(echo "$line" | xargs)
-            [ -n "$line" ] && test_links+=("$line")
-        fi
-    done <<< "$raw_input"
+    while IFS= read -r -d '' link; do
+        test_links+=("$link")
+    done < <(echo "$raw_input" | grep -oE "$regex" | tr '\n' '\0')
     
     if [ ${#test_links[@]} -eq 0 ]; then
         echo -e "${Error} 链接不能为空"
