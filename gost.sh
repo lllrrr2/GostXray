@@ -1,518 +1,73 @@
-﻿#!/bin/bash
-main
-# ==================== 格式化显示函数 ====================
-
-format_vless() {
-    local uuid="$1" host="$2" port="$3" type="$4" security="$5" sni="$6"
-    local path="$7" flow="$8" host_param="$9" fp="${10}" pbk="${11}" sid="${12}"
-    
-    echo -e "${Cyan_font_prefix}📍 基本信息:${Font_color_suffix}"
-    echo -e "   UUID      : ${Green_font_prefix}$uuid${Font_color_suffix}"
-    echo -e "   服务器    : ${Yellow_font_prefix}$host${Font_color_suffix}"
-    echo -e "   端口      : ${Yellow_font_prefix}$port${Font_color_suffix}"
-    
-    if [ -n "$security" ] || [ -n "$flow" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🔐 安全配置:${Font_color_suffix}"
-        [ -n "$security" ] && echo -e "   传输协议  : $security"
-        [ -n "$flow" ] && echo -e "   Flow      : $flow"
-        [ -n "$sni" ] && echo -e "   SNI       : $sni"
-        [ -n "$fp" ] && echo -e "   指纹      : $fp"
-        [ -n "$pbk" ] && echo -e "   公钥(PBK) : ${pbk:0:16}..."
-        [ -n "$sid" ] && echo -e "   SID       : $sid"
-    fi
-    
-    if [ -n "$type" ] || [ -n "$path" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🌐 传输配置:${Font_color_suffix}"
-        [ -n "$type" ] && echo -e "   类型      : $type"
-        [ -n "$path" ] && echo -e "   路径      : $path"
-        [ -n "$host_param" ] && echo -e "   Host      : $host_param"
-    fi
-}
-
-format_vmess() {
-    local uuid="$1" host="$2" port="$3" net="$4" tls="$5" sni="$6"
-    local path="$7" aid="$8" ps="$9"
-    
-    echo -e "${Cyan_font_prefix}📍 基本信息:${Font_color_suffix}"
-    echo -e "   UUID      : ${Green_font_prefix}$uuid${Font_color_suffix}"
-    echo -e "   服务器    : ${Yellow_font_prefix}$host${Font_color_suffix}"
-    echo -e "   端口      : ${Yellow_font_prefix}$port${Font_color_suffix}"
-    [ -n "$ps" ] && echo -e "   备注名    : $ps"
-    [ -n "$aid" ] && echo -e "   AlterID   : $aid"
-    
-    if [ -n "$net" ] || [ -n "$path" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🌐 传输配置:${Font_color_suffix}"
-        [ -n "$net" ] && echo -e "   网络类型  : $net"
-        [ -n "$path" ] && echo -e "   路径      : $path"
-    fi
-    
-    if [ -n "$tls" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🔐 安全配置:${Font_color_suffix}"
-        echo -e "   TLS       : $tls"
-        [ -n "$sni" ] && echo -e "   SNI       : $sni"
-    fi
-}
-
-format_hysteria2() {
-    local password="$1" host="$2" port="$3" sni="$4" insecure="$5" obfs="$6" obfs_password="$7"
-    
-    echo -e "${Cyan_font_prefix}📍 基本信息:${Font_color_suffix}"
-    echo -e "   密码      : ${Green_font_prefix}${password:0:16}...${Font_color_suffix}"
-    echo -e "   服务器    : ${Yellow_font_prefix}$host${Font_color_suffix}"
-    echo -e "   端口      : ${Yellow_font_prefix}$port${Font_color_suffix}"
-    
-    if [ -n "$sni" ] || [ -n "$insecure" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🔐 安全配置:${Font_color_suffix}"
-        [ -n "$sni" ] && echo -e "   SNI       : $sni"
-        [ -n "$insecure" ] && echo -e "   验证证书  : $([ "$insecure" == "1" ] && echo "否" || echo "是")"
-    fi
-    
-    if [ -n "$obfs" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🌐 混淆配置:${Font_color_suffix}"
-        echo -e "   混淆类型  : $obfs"
-        [ -n "$obfs_password" ] && echo -e "   混淆密码  : ${obfs_password:0:12}..."
-    fi
-}
-
-format_tuic() {
-    local uuid="$1" password="$2" host="$3" port="$4" sni="$5" alpn="$6" cc="$7"
-    
-    echo -e "${Cyan_font_prefix}📍 基本信息:${Font_color_suffix}"
-    echo -e "   UUID      : ${Green_font_prefix}$uuid${Font_color_suffix}"
-    echo -e "   密码      : ${Green_font_prefix}${password:0:12}...${Font_color_suffix}"
-    echo -e "   服务器    : ${Yellow_font_prefix}$host${Font_color_suffix}"
-    echo -e "   端口      : ${Yellow_font_prefix}$port${Font_color_suffix}"
-    
-    if [ -n "$sni" ] || [ -n "$alpn" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🔐 安全配置:${Font_color_suffix}"
-        [ -n "$sni" ] && echo -e "   SNI       : $sni"
-        [ -n "$alpn" ] && echo -e "   ALPN      : $alpn"
-    fi
-    
-    if [ -n "$cc" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🌐 传输配置:${Font_color_suffix}"
-        echo -e "   拥塞控制  : $cc"
-    fi
-}
-
-format_trojan() {
-    local password="$1" host="$2" port="$3" sni="$4" type="$5" path="$6" host_param="$7"
-    
-    echo -e "${Cyan_font_prefix}📍 基本信息:${Font_color_suffix}"
-    echo -e "   密码      : ${Green_font_prefix}${password:0:16}...${Font_color_suffix}"
-    echo -e "   服务器    : ${Yellow_font_prefix}$host${Font_color_suffix}"
-    echo -e "   端口      : ${Yellow_font_prefix}$port${Font_color_suffix}"
-    
-    if [ -n "$sni" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🔐 安全配置:${Font_color_suffix}"
-        echo -e "   SNI       : $sni"
-    fi
-    
-    if [ -n "$type" ] || [ -n "$path" ]; then
-        echo -e ""
-        echo -e "${Cyan_font_prefix}🌐 传输配置:${Font_color_suffix}"
-        [ -n "$type" ] && echo -e "   类型      : $type"
-        [ -n "$path" ] && echo -e "   路径      : $path"
-        [ -n "$host_param" ] && echo -e "   Host      : $host_param"
-    fi
-}
-
-format_ss() {
-    local method="$1" password="$2" host="$3" port="$4"
-    
-    echo -e "${Cyan_font_prefix}📍 基本信息:${Font_color_suffix}"
-    echo -e "   加密方法  : ${Green_font_prefix}$method${Font_color_suffix}"
-    echo -e "   密码      : ${Green_font_prefix}${password:0:16}...${Font_color_suffix}"
-    echo -e "   服务器    : ${Yellow_font_prefix}$host${Font_color_suffix}"
-    echo -e "   端口      : ${Yellow_font_prefix}$port${Font_color_suffix}"
-}
-
-# 格式化显示调度函数
-format_parsed_result() {
-    local protocol="$1"
-    local parsed="$2"
-    
-    IFS='|' read -ra fields <<< "$parsed"
-    
-    case "$protocol" in
-        vless) format_vless "${fields[@]}" ;;
-        vmess) format_vmess "${fields[@]}" ;;
-        hysteria2) format_hysteria2 "${fields[@]}" ;;
-        tuic) format_tuic "${fields[@]}" ;;
-        trojan) format_trojan "${fields[@]}" ;;
-        ss) format_ss "${fields[@]}" ;;
-        *)
-            echo -e "${Cyan_font_prefix}解析结果:${Font_color_suffix}"
-            echo -e "${parsed}"
-            ;;
-    esac
-}
-
-# ==================== 链接重建函数 ====================
-
-rebuild_vless_link() {
-    IFS='|' read -ra fields <<< "$1"
-    local uuid="${fields[0]}" host="${fields[1]}" port="${fields[2]}" type="${fields[3]}"
-    local security="${fields[4]}" sni="${fields[5]}" path="${fields[6]}" flow="${fields[7]}"
-    local host_param="${fields[8]}" fp="${fields[9]}" pbk="${fields[10]}" sid="${fields[11]}"
-    
-    local link="vless://${uuid}@${host}:${port}"
-    local params=""
-    
-    [ -n "$type" ] && params="${params}&type=${type}"
-    [ -n "$security" ] && params="${params}&security=${security}"
-    [ -n "$encryption" ] && params="${params}&encryption=none"
-    [ -n "$sni" ] && params="${params}&sni=${sni}"
-    [ -n "$flow" ] && params="${params}&flow=${flow}"
-    [ -n "$fp" ] && params="${params}&fp=${fp}"
-    [ -n "$pbk" ] && params="${params}&pbk=${pbk}"
-    [ -n "$sid" ] && params="${params}&sid=${sid}"
-    [ -n "$path" ] && params="${params}&path=${path}"
-    [ -n "$host_param" ] && params="${params}&host=${host_param}"
-    
-    params="${params#&}"
-    [ -n "$params" ] && link="${link}?${params}"
-    link="${link}#Relay-${host}"
-    
-    echo "$link"
-}
-
-rebuild_vmess_link() {
-    IFS='|' read -ra fields <<< "$1"
-    local uuid="${fields[0]}" host="${fields[1]}" port="${fields[2]}" net="${fields[3]}"
-    local tls="${fields[4]}" sni="${fields[5]}" path="${fields[6]}" aid="${fields[7]}" ps="${fields[8]}"
-    
-    local json=$(cat <<EOF
-{
-  "v": "2",
-  "ps": "${ps:-Relay-${host}}",
-  "add": "${host}",
-  "port": "${port}",
-  "id": "${uuid}",
-  "aid": "${aid:-0}",
-  "net": "${net:-tcp}",
-  "type": "none",
-  "host": "",
-  "path": "${path}",
-  "tls": "${tls}",
-  "sni": "${sni}"
-}
-EOF
-)
-    
-    local encoded=$(echo -n "$json" | base64 -w 0 2>/dev/null || echo -n "$json" | base64)
-    echo "vmess://${encoded}"
-}
-
-rebuild_hysteria2_link() {
-    IFS='|' read -ra fields <<< "$1"
-    local password="${fields[0]}" host="${fields[1]}" port="${fields[2]}" sni="${fields[3]}"
-    local insecure="${fields[4]}" obfs="${fields[5]}" obfs_password="${fields[6]}"
-    
-    local link="hysteria2://${password}@${host}:${port}"
-    local params=""
-    
-    [ -n "$sni" ] && params="${params}&sni=${sni}"
-    [ -n "$insecure" ] && params="${params}&insecure=${insecure}"
-    [ -n "$obfs" ] && params="${params}&obfs=${obfs}"
-    [ -n "$obfs_password" ] && params="${params}&obfs-password=${obfs_password}"
-    
-    params="${params#&}"
-    [ -n "$params" ] && link="${link}?${params}"
-    link="${link}#Relay-${host}"
-    
-    echo "$link"
-}
-
-rebuild_tuic_link() {
-    IFS='|' read -ra fields <<< "$1"
-    local uuid="${fields[0]}" password="${fields[1]}" host="${fields[2]}" port="${fields[3]}"
-    local sni="${fields[4]}" alpn="${fields[5]}" cc="${fields[6]}"
-    
-    local link="tuic://${uuid}:${password}@${host}:${port}"
-    local params=""
-    
-    [ -n "$sni" ] && params="${params}&sni=${sni}"
-    [ -n "$alpn" ] && params="${params}&alpn=${alpn}"
-    [ -n "$cc" ] && params="${params}&congestion_control=${cc}"
-    
-    params="${params#&}"
-    [ -n "$params" ] && link="${link}?${params}"
-    link="${link}#Relay-${host}"
-    
-    echo "$link"
-}
-
-rebuild_trojan_link() {
-    IFS='|' read -ra fields <<< "$1"
-    local password="${fields[0]}" host="${fields[1]}" port="${fields[2]}" sni="${fields[3]}"
-    local type="${fields[4]}" path="${fields[5]}" host_param="${fields[6]}"
-    
-    local link="trojan://${password}@${host}:${port}"
-    local params=""
-    
-    [ -n "$sni" ] && params="${params}&sni=${sni}"
-    [ -n "$type" ] && params="${params}&type=${type}"
-    [ -n "$path" ] && params="${params}&path=${path}"
-    [ -n "$host_param" ] && params="${params}&host=${host_param}"
-    
-    params="${params#&}"
-    [ -n "$params" ] && link="${link}?${params}"
-    link="${link}#Relay-${host}"
-    
-    echo "$link"
-}
-
-rebuild_ss_link() {
-    IFS='|' read -ra fields <<< "$1"
-    local method="${fields[0]}" password="${fields[1]}" host="${fields[2]}" port="${fields[3]}"
-    
-    local userinfo=$(echo -n "${method}:${password}" | base64 -w 0 2>/dev/null || echo -n "${method}:${password}" | base64)
-    echo "ss://${userinfo}@${host}:${port}#Relay-${host}"
-}
-
-# 链接重建调度函数
-rebuild_link() {
-    local protocol="$1"
-    local parsed="$2"
-    
-    case "$protocol" in
-        vless) rebuild_vless_link "$parsed" ;;
-        vmess) rebuild_vmess_link "$parsed" ;;
-        hysteria2) rebuild_hysteria2_link "$parsed" ;;
-        tuic) rebuild_tuic_link "$parsed" ;;
-        trojan) rebuild_trojan_link "$parsed" ;;
-        ss) rebuild_ss_link "$parsed" ;;
-        *)
-            echo ""
-            ;;
-    esac
-}
-
-# ==================== 节点信息替换函数 ====================
-
-replace_node_info() {
-    local protocol="$1"
-    local parsed="$2"
-    
-    echo -e ""
-    echo -e "${Info} 是否需要替换节点信息？[y/N]"
-    read -p "" need_replace
-    
-    if [[ ! $need_replace =~ ^[Yy]$ ]]; then
-        return 1
-    fi
-    
-    echo -e "${Info} 请选择要替换的字段："
-    echo -e "  ${Green_font_prefix}[1]${Font_color_suffix} 服务器地址"
-    echo -e "  ${Green_font_prefix}[2]${Font_color_suffix} 端口"
-    echo -e "  ${Green_font_prefix}[3]${Font_color_suffix} 服务器地址 + 端口"
-    echo -e "  ${Green_font_prefix}[0]${Font_color_suffix} 取消"
-    
-    read -p "请选择 [0-3]: " choice
-    
-    IFS='|' read -ra fields <<< "$parsed"
-    
-    case $choice in
-        1)
-            read -p "请输入新的服务器地址: " new_host
-            # 根据协议调整字段位置
-            case "$protocol" in
-                vless) fields[1]="$new_host" ;;
-                vmess) fields[1]="$new_host" ;;
-                hysteria2) fields[1]="$new_host" ;;
-                tuic) fields[2]="$new_host" ;;
-                trojan) fields[1]="$new_host" ;;
-                ss) fields[2]="$new_host" ;;
-            esac
-            ;;
-        2)
-            read -p "请输入新的端口: " new_port
-            case "$protocol" in
-                vless) fields[2]="$new_port" ;;
-                vmess) fields[2]="$new_port" ;;
-                hysteria2) fields[2]="$new_port" ;;
-                tuic) fields[3]="$new_port" ;;
-                trojan) fields[2]="$new_port" ;;
-                ss) fields[3]="$new_port" ;;
-            esac
-            ;;
-        3)
-            read -p "请输入新的服务器地址: " new_host
-            read -p "请输入新的端口: " new_port
-            case "$protocol" in
-                vless)
-                    fields[1]="$new_host"
-                    fields[2]="$new_port"
-                    ;;
-                vmess)
-                    fields[1]="$new_host"
-                    fields[2]="$new_port"
-                    ;;
-                hysteria2)
-                    fields[1]="$new_host"
-                    fields[2]="$new_port"
-                    ;;
-                tuic)
-                    fields[2]="$new_host"
-                    fields[3]="$new_port"
-                    ;;
-                trojan)
-                    fields[1]="$new_host"
-                    fields[2]="$new_port"
-                    ;;
-                ss)
-                    fields[2]="$new_host"
-                    fields[3]="$new_port"
-                    ;;
-            esac
-            ;;
-        0|*)
-            return 1
-            ;;
-    esac
-    
-    # 重新组合
-    parsed=$(IFS='|'; echo "${fields[*]}")
-    echo "$parsed"
-    return 0
-}
 #!/bin/bash
-# GOST v3 + Xray 任意门 中转脚本
-# 支持协议: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, AnyTLS, SOCKS, HTTP
-# 快捷命令: gostxray
+# GOST v3 中转脚本 - 普通 VPS 版本
+# 适用于 Linux VPS (root 环境，使用 systemd)
+# 支持协议: VLESS, VMess, Trojan, Shadowsocks, Hysteria2, TUIC, SOCKS, HTTP
+# 快捷命令: gost
 
-Green_font_prefix="\033[32m" && Red_font_prefix="\033[31m" && Yellow_font_prefix="\033[33m"
-Blue_font_prefix="\033[34m" && Purple_font_prefix="\033[35m" && Cyan_font_prefix="\033[36m"
-Green_background_prefix="\033[42;37m" && Font_color_suffix="\033[0m"
-Info="${Green_font_prefix}[信息]${Font_color_suffix}"
-Error="${Red_font_prefix}[错误]${Font_color_suffix}"
-Warning="${Yellow_font_prefix}[警告]${Font_color_suffix}"
-Tip="${Cyan_font_prefix}[提示]${Font_color_suffix}"
+Green="\033[32m" && Red="\033[31m" && Yellow="\033[33m"
+Cyan="\033[36m" && Reset="\033[0m"
+Info="${Green}[信息]${Reset}"
+Error="${Red}[错误]${Reset}"
+Warning="${Yellow}[警告]${Reset}"
+Tip="${Cyan}[提示]${Reset}"
 
-shell_version="3.1.0"
+shell_version="3.5.0"
 gost_version="3.0.0"
-gost_conf_path="/etc/gost3/config.yaml"
-xray_conf_path="/etc/xray/config.json"
-raw_conf_path="/etc/gost3/rawconf"
-port_conf_path="/etc/gost3/ports.conf"
-script_path="/usr/local/bin/gostxray"
 
-# ==================== 工具函数 ====================
-check_root() {
-    [[ $EUID != 0 ]] && echo -e "${Error} 当前非ROOT账号，请使用 sudo su 获取权限" && exit 1
+# 目录配置
+GOST_DIR="/etc/gost3"
+GOST_BIN="/usr/bin/gost"
+GOST_CONF="$GOST_DIR/config.yaml"
+RAW_CONF="$GOST_DIR/rawconf"
+PORT_CONF="$GOST_DIR/ports.conf"
+SERVICE_FILE="/etc/systemd/system/gost.service"
+
+# ==================== 初始化 ====================
+init_dirs() {
+    mkdir -p "$GOST_DIR"
+    touch "$RAW_CONF" "$PORT_CONF" 2>/dev/null
 }
 
-check_sys() {
-    if [[ -f /etc/redhat-release ]]; then
-        release="centos"
-    elif cat /etc/issue 2>/dev/null | grep -q -E -i "debian"; then
-        release="debian"
-    elif cat /etc/issue 2>/dev/null | grep -q -E -i "ubuntu"; then
-        release="ubuntu"
-    elif cat /proc/version | grep -q -E -i "debian"; then
-        release="debian"
-    elif cat /proc/version | grep -q -E -i "ubuntu"; then
-        release="ubuntu"
-    elif cat /proc/version | grep -q -E -i "centos|red hat|redhat"; then
-        release="centos"
+# ==================== Root 检查 ====================
+check_root() {
+    if [ "$(id -u)" != "0" ]; then
+        echo -e "${Error} 请以 root 用户运行此脚本"
+        exit 1
+    fi
+}
+
+# ==================== 系统检测 ====================
+check_system() {
+    local os=$(uname -s)
+    local arch=$(uname -m)
+    
+    if [[ "$os" != "Linux" ]]; then
+        echo -e "${Error} 此脚本仅支持 Linux 系统"
+        exit 1
     fi
     
-    arch=$(uname -m)
     case $arch in
-        x86_64) arch="amd64" ;;
-        aarch64) arch="arm64" ;;
-        armv7l) arch="armv7" ;;
-        armv6l) arch="armv6" ;;
-        i686|i386) arch="386" ;;
+        x86_64|amd64) ARCH="amd64" ;;
+        aarch64|arm64) ARCH="arm64" ;;
+        i386|i686) ARCH="386" ;;
+        armv7l) ARCH="armv7" ;;
         *) echo -e "${Error} 不支持的架构: $arch"; exit 1 ;;
     esac
-}
-
-install_deps() {
-    echo -e "${Info} 安装依赖..."
-    if [[ ${release} == "centos" ]]; then
-        yum install -y wget curl jq tar gzip net-tools >/dev/null 2>&1
-    else
-        apt-get update >/dev/null 2>&1
-        apt-get install -y wget curl jq tar gzip net-tools >/dev/null 2>&1
-    fi
-}
-
-get_ip() {
-    local ip=$(curl -s4m5 ip.sb 2>/dev/null || curl -s4m5 ifconfig.me 2>/dev/null || curl -s4m5 ipinfo.io/ip 2>/dev/null)
-    echo "$ip"
-}
-
-# ==================== 快捷命令安装 ====================
-install_shortcut() {
-    echo -e "${Info} 安装快捷命令..."
     
-    # 获取当前脚本的实际路径
-    local current_script=$(readlink -f "$0")
-    
-    # 复制脚本到 /usr/local/bin
-    cp "$current_script" "$script_path"
-    chmod +x "$script_path"
-    
-    echo -e "${Info} 快捷命令安装完成！"
-    echo -e "${Tip} 现在可以在任意位置输入 ${Green_font_prefix}gostxray${Font_color_suffix} 进入管理菜单"
+    echo -e "${Info} 系统: $os ($arch)"
 }
 
-uninstall_shortcut() {
-    if [[ -f "$script_path" ]]; then
-        rm -f "$script_path"
-        echo -e "${Info} 快捷命令已删除"
-    else
-        echo -e "${Warning} 快捷命令不存在"
-    fi
-}
-
-check_shortcut() {
-    if [[ -f "$script_path" ]]; then
-        echo -e "${Info} 快捷命令 ${Green_font_prefix}gost${Font_color_suffix} 已安装"
-        return 0
-    else
-        return 1
-    fi
-}
-
-# ==================== 端口管理 ====================
 # ==================== 端口管理 ====================
 get_random_port() {
-    local min=$1
-    local max=$2
-    shuf -i ${min}-${max} -n 1
+    local min=${1:-10000}
+    local max=${2:-65535}
+    echo $((RANDOM % (max - min + 1) + min))
 }
 
-get_next_port() {
-    local min=$1
-    local max=$2
-    local used_ports=$(cat $port_conf_path 2>/dev/null | tr '\n' ' ')
-    
-    for ((port=min; port<=max; port++)); do
-        if ! echo "$used_ports" | grep -qw "$port"; then
-            if ! ss -tuln 2>/dev/null | grep -q ":$port "; then
-                echo $port
-                return
-            fi
-        fi
-    done
-    echo "0"
-}
-
-check_port_available() {
+check_port() {
     local port=$1
-    if ss -tuln 2>/dev/null | grep -q ":$port "; then
+    if ss -tuln 2>/dev/null | grep -q ":$port " || \
+       netstat -tuln 2>/dev/null | grep -q ":$port "; then
         return 1
     fi
     return 0
@@ -520,376 +75,246 @@ check_port_available() {
 
 open_port() {
     local port=$1
-    if [[ -z "$port" ]]; then
-        return
+    # iptables
+    if command -v iptables &>/dev/null; then
+        iptables -I INPUT -p tcp --dport $port -j ACCEPT 2>/dev/null
+        iptables -I INPUT -p udp --dport $port -j ACCEPT 2>/dev/null
     fi
-    
-    # Check if ufw is available and active
-    if command -v ufw >/dev/null 2>&1 && systemctl is-active ufw &>/dev/null; then
-        ufw allow $port/tcp >/dev/null 2>&1
-        ufw allow $port/udp >/dev/null 2>&1
-        echo -e "${Info} 已通过 UFW 开放端口 $port"
-    
-    # Check if firewalld is available and active
-    elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active firewalld &>/dev/null; then
-        firewall-cmd --zone=public --add-port=$port/tcp --permanent >/dev/null 2>&1
-        firewall-cmd --zone=public --add-port=$port/udp --permanent >/dev/null 2>&1
-        firewall-cmd --reload >/dev/null 2>&1
-        echo -e "${Info} 已通过 FirewallD 开放端口 $port"
-        
-    # Fallback to iptables
-    elif command -v iptables >/dev/null 2>&1; then
-        iptables -I INPUT -p tcp --dport $port -j ACCEPT >/dev/null 2>&1
-        iptables -I INPUT -p udp --dport $port -j ACCEPT >/dev/null 2>&1
-        # Try to save rules if possible (distro-specific)
-        if command -v netfilter-persistent >/dev/null 2>&1; then
-            netfilter-persistent save >/dev/null 2>&1
-        elif command -v service >/dev/null 2>&1; then
-            service iptables save >/dev/null 2>&1
-        fi
-        echo -e "${Info} 已通过 IPTables 开放端口 $port"
+    # firewalld
+    if command -v firewall-cmd &>/dev/null && systemctl is-active firewalld &>/dev/null; then
+        firewall-cmd --zone=public --add-port=$port/tcp --permanent 2>/dev/null
+        firewall-cmd --zone=public --add-port=$port/udp --permanent 2>/dev/null
+        firewall-cmd --reload 2>/dev/null
+    fi
+    # ufw
+    if command -v ufw &>/dev/null && ufw status | grep -q "active"; then
+        ufw allow $port 2>/dev/null
     fi
 }
 
 read_port_config() {
     echo -e ""
-    echo -e "${Info} 端口配置选项:"
-    echo -e "-----------------------------------"
-    echo -e "[1] 随机选择端口 (10000-65535)"
-    echo -e "[2] 指定端口范围自动分配"
-    echo -e "[3] 手动指定端口"
-    echo -e "-----------------------------------"
-    
-    # 清空输入缓冲区
-    while read -r -t 0.1 _discard; do :; done
-    
+    echo -e "${Info} 端口配置:"
+    echo -e "[1] 随机端口 (10000-65535)"
+    echo -e "[2] 手动指定端口"
     read -p "请选择 [默认1]: " port_mode
-    # 清理回车符和空格
-    port_mode=$(echo "$port_mode" | tr -d '\r\n' | xargs)
     port_mode=${port_mode:-1}
-    
-    # Validate input is a number between 1-3
-    if [[ ! "$port_mode" =~ ^[1-3]$ ]]; then
-        echo -e "${Error} 无效选择，请输入 1-3"
-        return 1
-    fi
     
     case $port_mode in
         1)
             local_port=$(get_random_port 10000 65535)
             local retry=0
-            while ! check_port_available $local_port && [ $retry -lt 10 ]; do
+            while ! check_port $local_port && [ $retry -lt 20 ]; do
                 local_port=$(get_random_port 10000 65535)
                 ((retry++))
             done
-            echo -e "${Info} 随机分配端口: ${Green_font_prefix}$local_port${Font_color_suffix}"
+            echo -e "${Info} 分配端口: ${Green}$local_port${Reset}"
             ;;
         2)
-            read -p "请输入端口范围起始值 [默认10000]: " port_min
-            read -p "请输入端口范围结束值 [默认65535]: " port_max
-            port_min=${port_min:-10000}
-            port_max=${port_max:-65535}
-            local_port=$(get_next_port $port_min $port_max)
-            if [ "$local_port" == "0" ]; then
-                echo -e "${Error} 指定范围内没有可用端口"
-                return 1
+            read -p "请输入端口: " local_port
+            if ! check_port $local_port; then
+                echo -e "${Warning} 端口 $local_port 可能已被占用"
             fi
-            echo -e "${Info} 自动分配端口: ${Green_font_prefix}$local_port${Font_color_suffix}"
             ;;
-        3)
-            read -p "请输入本地监听端口: " local_port
-            # Validate port number
-            if [[ ! "$local_port" =~ ^[0-9]+$ ]] || [ "$local_port" -lt 1 ] || [ "$local_port" -gt 65535 ]; then
-                echo -e "${Error} 端口号必须在 1-65535 之间"
-                return 1
-            fi
-            if ! check_port_available $local_port; then
-                echo -e "${Warning} 端口 $local_port 已被占用"
-                read -p "是否继续使用? [y/N]: " confirm
-                [[ ! $confirm =~ ^[Yy]$ ]] && return 1
-            fi
+        *)
+            echo -e "${Error} 无效选择"
+            return 1
             ;;
     esac
     
-    # 开放端口防火墙
     open_port "$local_port"
-    
-    # 记录使用的端口
-    mkdir -p /etc/gost3
-    echo "$local_port" >> $port_conf_path
+    echo "$local_port" >> "$PORT_CONF"
     return 0
 }
 
 # ==================== Base64 解码 ====================
 base64_decode() {
     local input="$1"
-    # 处理 URL 安全的 base64
     input="${input//-/+}"
     input="${input//_/\/}"
-    # 修复 base64 填充
     local mod=$((${#input} % 4))
-    if [ $mod -eq 2 ]; then
-        input="${input}=="
-    elif [ $mod -eq 3 ]; then
-        input="${input}="
-    fi
+    [ $mod -eq 2 ] && input="${input}=="
+    [ $mod -eq 3 ] && input="${input}="
     echo "$input" | base64 -d 2>/dev/null
 }
 
 url_decode() {
-    local url_encoded="${1//+/ }"
-    printf '%b' "${url_encoded//%/\\x}"
+    local url="${1//+/ }"
+    printf '%b' "${url//%/\\x}"
 }
 
-# ==================== 协议解析函数 ====================
+# ==================== 协议解析 ====================
 parse_vless() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#vless://}"
-    
-    local user_host="${link%%\?*}"
-    local params="${link#*\?}"
-    
-    local uuid="${user_host%%@*}"
-    local host_port="${user_host#*@}"
+    local link="${1#vless://}"
+    local uuid="${link%%@*}"
+    local rest="${link#*@}"
+    local host_port="${rest%%\?*}"
     local host="${host_port%%:*}"
     local port="${host_port##*:}"
     port="${port%%#*}"
     
-    # 解析参数
-    local type="" security="" sni="" path="" flow="" host_param="" fp="" pbk="" sid=""
+    local params="${rest#*\?}"
+    local type="" security="" sni="" path="" flow="" fp="" pbk="" sid=""
     while IFS='=' read -r key value; do
-        value="${value%%#*}"  # 移除 fragment
+        value="${value%%#*}"
         case $key in
             type) type="$value" ;;
             security) security="$value" ;;
             sni) sni="$value" ;;
-            path) path="$(echo -e "${value//%/\\x}")" ;;  # URL解码 path
+            path) path="$(url_decode "$value")" ;;
             flow) flow="$value" ;;
-            host) host_param="$value" ;;
             fp) fp="$value" ;;
             pbk) pbk="$value" ;;
             sid) sid="$value" ;;
         esac
     done <<< "$(echo "$params" | tr '&' '\n' | cut -d'#' -f1)"
     
-    echo "vless|$uuid|$host|$port|$type|$security|$sni|$path|$flow|$host_param|$fp|$pbk|$sid"
+    echo "vless|$uuid|$host|$port|$type|$security|$sni|$path|$flow|$fp|$pbk|$sid"
 }
 
 parse_vmess() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#vmess://}"
+    local link="${1#vmess://}"
     local decoded=$(base64_decode "$link")
     
-    if [ -z "$decoded" ]; then
-        echo "vmess|||||||||||"
-        return
+    if command -v jq &>/dev/null; then
+        local host=$(echo "$decoded" | jq -r '.add // ""')
+        local port=$(echo "$decoded" | jq -r '.port // ""')
+        local uuid=$(echo "$decoded" | jq -r '.id // ""')
+        local net=$(echo "$decoded" | jq -r '.net // "tcp"')
+        local tls=$(echo "$decoded" | jq -r '.tls // ""')
+        local sni=$(echo "$decoded" | jq -r '.sni // ""')
+        local path=$(echo "$decoded" | jq -r '.path // ""')
+        local aid=$(echo "$decoded" | jq -r '.aid // "0"')
+        local ps=$(echo "$decoded" | jq -r '.ps // ""')
+        echo "vmess|$uuid|$host|$port|$net|$tls|$sni|$path|$aid|$ps"
+    else
+        local host=$(echo "$decoded" | grep -o '"add"[^,]*' | cut -d'"' -f4)
+        local port=$(echo "$decoded" | grep -o '"port"[^,]*' | sed 's/[^0-9]//g')
+        echo "vmess||$host|$port||||||"
     fi
-    
-    local host=$(echo "$decoded" | jq -r '.add // .host // ""' 2>/dev/null)
-    local port=$(echo "$decoded" | jq -r '.port // ""' 2>/dev/null)
-    local uuid=$(echo "$decoded" | jq -r '.id // ""' 2>/dev/null)
-    local aid=$(echo "$decoded" | jq -r '.aid // "0"' 2>/dev/null)
-    local net=$(echo "$decoded" | jq -r '.net // "tcp"' 2>/dev/null)
-    local type=$(echo "$decoded" | jq -r '.type // "none"' 2>/dev/null)
-    local tls=$(echo "$decoded" | jq -r '.tls // ""' 2>/dev/null)
-    local sni=$(echo "$decoded" | jq -r '.sni // ""' 2>/dev/null)
-    local path=$(echo "$decoded" | jq -r '.path // ""' 2>/dev/null)
-    local ps=$(echo "$decoded" | jq -r '.ps // ""' 2>/dev/null)
-    
-    echo "vmess|$uuid|$host|$port|$net|$tls|$sni|$path|$aid|$ps"
 }
 
 parse_trojan() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#trojan://}"
-    
-    local pass_host="${link%%\?*}"
-    local params="${link#*\?}"
-    
-    local password="${pass_host%%@*}"
-    local host_port="${pass_host#*@}"
+    local link="${1#trojan://}"
+    local password="${link%%@*}"
+    local rest="${link#*@}"
+    local host_port="${rest%%\?*}"
     local host="${host_port%%:*}"
     local port="${host_port##*:}"
     port="${port%%#*}"
     
-    local sni="" type="" host_param="" path=""
+    local params="${rest#*\?}"
+    local sni="" type=""
     while IFS='=' read -r key value; do
-        value="${value%%#*}"  # 移除 fragment
         case $key in
             sni) sni="$value" ;;
             type) type="$value" ;;
-            host) host_param="$value" ;;
-            path) path="$value" ;;
         esac
     done <<< "$(echo "$params" | tr '&' '\n' | cut -d'#' -f1)"
     
-    echo "trojan|$password|$host|$port|$type|$sni|$host_param|$path"
+    echo "trojan|$password|$host|$port|$type|$sni"
 }
 
 parse_ss() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#ss://}"
-    
+    local link="${1#ss://}"
     local method="" password="" host="" port=""
     
     if [[ "$link" == *"@"* ]]; then
-        local encoded_part="${link%%@*}"
-        local host_part="${link#*@}"
-        local decoded=$(base64_decode "$encoded_part")
+        local encoded="${link%%@*}"
+        local decoded=$(base64_decode "$encoded")
         method="${decoded%%:*}"
         password="${decoded#*:}"
+        local host_part="${link#*@}"
         host="${host_part%%:*}"
         port="${host_part##*:}"
         port="${port%%#*}"
-        port="${port%%\?*}"
     else
         local decoded=$(base64_decode "${link%%#*}")
         method="${decoded%%:*}"
         local rest="${decoded#*:}"
         password="${rest%%@*}"
-        local host_port="${rest#*@}"
-        host="${host_port%%:*}"
-        port="${host_port##*:}"
+        local hp="${rest#*@}"
+        host="${hp%%:*}"
+        port="${hp##*:}"
     fi
     
     echo "ss|$method|$password|$host|$port"
 }
 
 parse_hysteria2() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#hysteria2://}"
+    local link="${1#hysteria2://}"
     link="${link#hy2://}"
-    
-    local auth_host="${link%%\?*}"
-    local params="${link#*\?}"
-    
-    local password="${auth_host%%@*}"
-    local host_port="${auth_host#*@}"
-    local host="${host_port%%:*}"
-    local port="${host_port##*:}"
-    # 清理端口中的特殊字符 (/, #, ? 等)
-    port="${port%%/*}"
-    port="${port%%#*}"
-    port="${port%%\?*}"
-    
-    local sni="" insecure="" obfs="" obfs_password=""
-    while IFS='=' read -r key value; do
-        value="${value%%#*}"  # 移除 fragment
-        case $key in
-            sni) sni="$value" ;;
-            insecure) insecure="$value" ;;
-            obfs) obfs="$value" ;;
-            obfs-password) obfs_password="$value" ;;
-        esac
-    done <<< "$(echo "$params" | tr '&' '\n' | cut -d'#' -f1)"
-    
-    echo "hysteria2|$password|$host|$port|$sni|$insecure|$obfs|$obfs_password"
-}
-
-parse_tuic() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#tuic://}"
-    
-    local auth="${link%%@*}"
-    local uuid="${auth%%:*}"
-    local password="${auth#*:}"
-    
+    local password="${link%%@*}"
     local rest="${link#*@}"
     local host_port="${rest%%\?*}"
     local host="${host_port%%:*}"
     local port="${host_port##*:}"
-    # 清理端口中的特殊字符 (/, #, ? 等)
     port="${port%%/*}"
     port="${port%%#*}"
-    port="${port%%\?*}"
     
     local params="${rest#*\?}"
-    local sni="" alpn="" congestion_control="" udp_relay_mode="" allow_insecure=""
+    local sni="" insecure=""
     while IFS='=' read -r key value; do
-        # 简化处理，不使用 url_decode 避免可能的问题
-        value="${value%%#*}"  # 移除 fragment
         case $key in
             sni) sni="$value" ;;
-            alpn) alpn="$value" ;;
-            congestion_control) congestion_control="$value" ;;
-            udp_relay_mode) udp_relay_mode="$value" ;;
-            allow_insecure) allow_insecure="$value" ;;
+            insecure) insecure="$value" ;;
         esac
     done <<< "$(echo "$params" | tr '&' '\n' | cut -d'#' -f1)"
     
-    echo "tuic|$uuid|$password|$host|$port|$sni|$alpn|$congestion_control"
+    echo "hysteria2|$password|$host|$port|$sni|$insecure"
+}
+
+parse_tuic() {
+    local link="${1#tuic://}"
+    local auth="${link%%@*}"
+    local uuid="${auth%%:*}"
+    local password="${auth#*:}"
+    local rest="${link#*@}"
+    local host_port="${rest%%\?*}"
+    local host="${host_port%%:*}"
+    local port="${host_port##*:}"
+    port="${port%%/*}"
+    port="${port%%#*}"
+    
+    local params="${rest#*\?}"
+    local sni="" alpn="" cc=""
+    while IFS='=' read -r key value; do
+        case $key in
+            sni) sni="$value" ;;
+            alpn) alpn="$value" ;;
+            congestion_control) cc="$value" ;;
+        esac
+    done <<< "$(echo "$params" | tr '&' '\n' | cut -d'#' -f1)"
+    
+    echo "tuic|$uuid|$password|$host|$port|$sni|$alpn|$cc"
 }
 
 parse_socks() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#socks://}"
+    local link="${1#socks://}"
     link="${link#socks5://}"
+    local user="" pass="" host="" port=""
     
     if [[ "$link" == *"@"* ]]; then
         local auth="${link%%@*}"
         local decoded=$(base64_decode "$auth" 2>/dev/null || echo "$auth")
-        local user="${decoded%%:*}"
-        local pass="${decoded#*:}"
-        local host_port="${link#*@}"
+        user="${decoded%%:*}"
+        pass="${decoded#*:}"
+        local hp="${link#*@}"
+        host="${hp%%:*}"
+        port="${hp##*:}"
     else
-        local user="" pass=""
-        local host_port="${link%%#*}"
+        local hp="${link%%#*}"
+        host="${hp%%:*}"
+        port="${hp##*:}"
     fi
-    
-    local host="${host_port%%:*}"
-    local port="${host_port##*:}"
     port="${port%%#*}"
-    port="${port%%\?*}"
     
     echo "socks|$user|$pass|$host|$port"
 }
 
-parse_http() {
-    local link="$1"
-    # 清理链接中可能的回车符和空格
-    link=$(echo "$link" | tr -d '\r' | xargs)
-    link="${link#http://}"
-    link="${link#https://}"
-    
-    if [[ "$link" == *"@"* ]]; then
-        local auth="${link%%@*}"
-        local user="${auth%%:*}"
-        local pass="${auth#*:}"
-        local host_port="${link#*@}"
-    else
-        local user="" pass=""
-        local host_port="${link%%/*}"
-        host_port="${host_port%%#*}"
-    fi
-    
-    local host="${host_port%%:*}"
-    local port="${host_port##*:}"
-    port="${port%%#*}"
-    port="${port%%\?*}"
-    
-    echo "http|$user|$pass|$host|$port"
-}
-
-# ==================== 自动识别协议 ====================
+# ==================== 协议识别 ====================
 detect_protocol() {
     local link="$1"
-    # 清理回车符和空白字符
-    link=$(echo "$link" | tr -d '\r\n' | xargs)
-    
     case "$link" in
         vless://*) echo "vless" ;;
         vmess://*) echo "vmess" ;;
@@ -898,16 +323,23 @@ detect_protocol() {
         hysteria2://*|hy2://*) echo "hysteria2" ;;
         tuic://*) echo "tuic" ;;
         socks://*|socks5://*) echo "socks" ;;
-        http://*|https://*) echo "http" ;;
+        http://*) echo "http" ;;
         *) echo "unknown" ;;
     esac
 }
 
-parse_node_link() {
+detect_protocol_type() {
+    local protocol=$1
+    case "$protocol" in
+        hysteria2|hy2|tuic|quic) echo "udp" ;;
+        *) echo "tcp" ;;
+    esac
+}
+
+parse_node() {
     local link="$1"
-    local protocol=$(detect_protocol "$link")
-    
-    case $protocol in
+    local proto=$(detect_protocol "$link")
+    case $proto in
         vless) parse_vless "$link" ;;
         vmess) parse_vmess "$link" ;;
         trojan) parse_trojan "$link" ;;
@@ -915,295 +347,150 @@ parse_node_link() {
         hysteria2) parse_hysteria2 "$link" ;;
         tuic) parse_tuic "$link" ;;
         socks) parse_socks "$link" ;;
-        http) parse_http "$link" ;;
         *) echo "unknown" ;;
     esac
 }
 
-get_target_from_parsed() {
-    local protocol="$1"
+get_target() {
+    local proto="$1"
     local parsed="$2"
+    IFS='|' read -ra p <<< "$parsed"
     
-    IFS='|' read -ra parts <<< "$parsed"
-    
-    case $protocol in
-        vless|vmess|trojan)
-            echo "${parts[2]}|${parts[3]}"
-            ;;
-        ss)
-            echo "${parts[3]}|${parts[4]}"
-            ;;
-        hysteria2)
-            echo "${parts[2]}|${parts[3]}"
-            ;;
-        tuic)
-            echo "${parts[3]}|${parts[4]}"
-            ;;
-        socks|http)
-            echo "${parts[3]}|${parts[4]}"
-            ;;
+    case $proto in
+        vless|vmess|trojan) echo "${p[2]}|${p[3]}" ;;
+        ss) echo "${p[3]}|${p[4]}" ;;
+        hysteria2) echo "${p[2]}|${p[3]}" ;;
+        tuic) echo "${p[3]}|${p[4]}" ;;
+        socks) echo "${p[3]}|${p[4]}" ;;
     esac
 }
 
-# ==================== GOST v3 安装 ====================
-install_gost3() {
-    check_root
-    check_sys
-    install_deps
-    
-    echo -e "${Info} 正在下载 GOST v3..."
-    
-    local download_url="https://github.com/go-gost/gost/releases/download/v${gost_version}/gost_${gost_version}_linux_${arch}.tar.gz"
-    
-    mkdir -p /etc/gost3
-    cd /tmp
-    rm -rf gost*
-    
-    # 尝试使用镜像
-    echo -e "${Info} 尝试从 GitHub 下载..."
-    if ! wget --no-check-certificate -t 3 -T 30 "$download_url" -O gost.tar.gz 2>/dev/null; then
-        echo -e "${Warning} GitHub 下载失败，尝试使用镜像..."
-        download_url="https://ghproxy.com/$download_url"
-        if ! wget --no-check-certificate -t 3 -T 30 "$download_url" -O gost.tar.gz 2>/dev/null; then
-            echo -e "${Error} GOST v3 下载失败"
-            return 1
-        fi
-    fi
-    
-    tar -xzf gost.tar.gz
-    mv gost /usr/bin/gost3
-    chmod +x /usr/bin/gost3
-    
-    # 创建 systemd 服务
-    cat > /etc/systemd/system/gost3.service << 'EOF'
-[Unit]
-Description=GOST v3 Proxy
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/gost3 -C /etc/gost3/config.yaml
-Restart=on-failure
-RestartSec=5
-LimitNOFILE=1048576
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # 初始化配置文件
-    cat > $gost_conf_path << 'EOF'
-services: []
-EOF
-
-    touch $raw_conf_path
-    touch $port_conf_path
-    
-    systemctl daemon-reload
-    systemctl enable gost3 >/dev/null 2>&1
-    
-    echo -e "${Info} GOST v3 安装完成"
-    echo -e "${Info} GOST 版本: $(/usr/bin/gost3 -V 2>&1 | head -1)"
-    rm -rf /tmp/gost*
-    
-    # 安装快捷命令
-    install_shortcut
-}
-
-# ==================== Xray 安装 ====================
-install_xray() {
-    check_root
-    check_sys
-    install_deps
-    
-    echo -e "${Info} 正在安装 Xray..."
-    
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install
-    
-    if [ $? -eq 0 ]; then
-        echo -e "${Info} Xray 安装完成"
-        
-        mkdir -p /etc/gost3
-        
-        # 初始化配置
-        cat > $xray_conf_path << 'EOF'
-{
-    "log": {
-        "loglevel": "warning"
-    },
-    "inbounds": [],
-    "outbounds": [
-        {
-            "protocol": "freedom",
-            "tag": "direct"
-        }
-    ],
-    "routing": {
-        "rules": []
-    }
-}
-EOF
-        systemctl restart xray
-        
-        # 如果没有安装快捷命令，也安装一下
-        if ! check_shortcut; then
-            install_shortcut
-        fi
-    else
-        echo -e "${Error} Xray 安装失败"
-    fi
-}
-
-# ==================== 生成中转链接 ====================
+# ==================== 中转链接生成 ====================
 generate_relay_link() {
-    local protocol="$1"
+    local proto="$1"
     local parsed="$2"
     local relay_ip="$3"
     local relay_port="$4"
     
-    IFS='|' read -ra parts <<< "$parsed"
+    IFS='|' read -ra p <<< "$parsed"
     
-    case $protocol in
+    case $proto in
         vless)
-            local uuid="${parts[1]}"
-            local orig_host="${parts[2]}"
-            local type="${parts[4]}"
-            local security="${parts[5]}"
-            local sni="${parts[6]}"
-            local path="${parts[7]}"
-            local flow="${parts[8]}"
-            local host_param="${parts[9]}"
-            local fp="${parts[10]}"
-            local pbk="${parts[11]}"
-            local sid="${parts[12]}"
-            
-            local new_link="vless://${uuid}@${relay_ip}:${relay_port}?"
-            [ -n "$type" ] && new_link+="type=${type}&"
-            [ -n "$security" ] && new_link+="security=${security}&"
-            [ -n "$sni" ] && new_link+="sni=${sni}&"
-            [ -n "$path" ] && new_link+="path=${path}&"
-            [ -n "$flow" ] && new_link+="flow=${flow}&"
-            [ -n "$host_param" ] && new_link+="host=${host_param}&"
-            [ -n "$fp" ] && new_link+="fp=${fp}&"
-            [ -n "$pbk" ] && new_link+="pbk=${pbk}&"
-            [ -n "$sid" ] && new_link+="sid=${sid}&"
-            new_link="${new_link%&}#Relay-${orig_host}"
-            echo "$new_link"
+            local link="vless://${p[1]}@${relay_ip}:${relay_port}?"
+            [ -n "${p[4]}" ] && link+="type=${p[4]}&"
+            [ -n "${p[5]}" ] && link+="security=${p[5]}&"
+            [ -n "${p[6]}" ] && link+="sni=${p[6]}&"
+            [ -n "${p[7]}" ] && link+="path=${p[7]}&"
+            [ -n "${p[8]}" ] && link+="flow=${p[8]}&"
+            [ -n "${p[9]}" ] && link+="fp=${p[9]}&"
+            [ -n "${p[10]}" ] && link+="pbk=${p[10]}&"
+            [ -n "${p[11]}" ] && link+="sid=${p[11]}&"
+            echo "${link%&}#Relay-${p[2]}"
             ;;
         vmess)
-            local uuid="${parts[1]}"
-            local orig_host="${parts[2]}"
-            local orig_port="${parts[3]}"
-            local net="${parts[4]}"
-            local tls="${parts[5]}"
-            local sni="${parts[6]}"
-            local path="${parts[7]}"
-            local aid="${parts[8]}"
-            local ps="${parts[9]}"
-            
-            local json="{\"v\":\"2\",\"ps\":\"Relay-${ps:-$orig_host}\",\"add\":\"${relay_ip}\",\"port\":\"${relay_port}\",\"id\":\"${uuid}\",\"aid\":\"${aid:-0}\",\"net\":\"${net:-tcp}\",\"type\":\"none\",\"host\":\"${sni}\",\"path\":\"${path}\",\"tls\":\"${tls}\"}"
-            echo "vmess://$(echo -n "$json" | base64 -w0)"
+            local json="{\"v\":\"2\",\"ps\":\"Relay-${p[2]}\",\"add\":\"${relay_ip}\",\"port\":\"${relay_port}\",\"id\":\"${p[1]}\",\"aid\":\"${p[8]:-0}\",\"net\":\"${p[4]:-tcp}\",\"type\":\"none\",\"host\":\"${p[6]}\",\"path\":\"${p[7]}\",\"tls\":\"${p[5]}\"}"
+            echo "vmess://$(echo -n "$json" | base64 -w 0 2>/dev/null || echo -n "$json" | base64 | tr -d '\n')"
             ;;
         trojan)
-            local password="${parts[1]}"
-            local orig_host="${parts[2]}"
-            local type="${parts[4]}"
-            local sni="${parts[5]}"
-            local host_param="${parts[6]}"
-            local path="${parts[7]}"
-            
-            local new_link="trojan://${password}@${relay_ip}:${relay_port}?"
-            [ -n "$type" ] && new_link+="type=${type}&"
-            [ -n "$sni" ] && new_link+="sni=${sni}&"
-            [ -n "$host_param" ] && new_link+="host=${host_param}&"
-            [ -n "$path" ] && new_link+="path=${path}&"
-            new_link="${new_link%&}#Relay-${orig_host}"
-            echo "$new_link"
+            local link="trojan://${p[1]}@${relay_ip}:${relay_port}?"
+            [ -n "${p[4]}" ] && link+="type=${p[4]}&"
+            [ -n "${p[5]}" ] && link+="sni=${p[5]}&"
+            echo "${link%&}#Relay-${p[2]}"
             ;;
         ss)
-            local method="${parts[1]}"
-            local password="${parts[2]}"
-            local orig_host="${parts[3]}"
-            
-            local auth=$(echo -n "${method}:${password}" | base64 -w0)
-            echo "ss://${auth}@${relay_ip}:${relay_port}#Relay-${orig_host}"
+            local auth=$(echo -n "${p[1]}:${p[2]}" | base64 -w 0 2>/dev/null || echo -n "${p[1]}:${p[2]}" | base64 | tr -d '\n')
+            echo "ss://${auth}@${relay_ip}:${relay_port}#Relay-${p[3]}"
             ;;
         hysteria2)
-            local password="${parts[1]}"
-            local orig_host="${parts[2]}"
-            local sni="${parts[4]}"
-            local insecure="${parts[5]}"
-            local obfs="${parts[6]}"
-            local obfs_password="${parts[7]}"
-            
-            local new_link="hysteria2://${password}@${relay_ip}:${relay_port}?"
-            [ -n "$sni" ] && new_link+="sni=${sni}&"
-            [ -n "$insecure" ] && new_link+="insecure=${insecure}&"
-            [ -n "$obfs" ] && new_link+="obfs=${obfs}&"
-            [ -n "$obfs_password" ] && new_link+="obfs-password=${obfs_password}&"
-            new_link="${new_link%&}#Relay-${orig_host}"
-            echo "$new_link"
+            local link="hysteria2://${p[1]}@${relay_ip}:${relay_port}?"
+            [ -n "${p[4]}" ] && link+="sni=${p[4]}&"
+            link+="insecure=1&"
+            echo "${link%&}#Relay-${p[2]}"
             ;;
         tuic)
-            local uuid="${parts[1]}"
-            local password="${parts[2]}"
-            local orig_host="${parts[3]}"
-            local sni="${parts[5]}"
-            local alpn="${parts[6]}"
-            local cc="${parts[7]}"
-            
-            local new_link="tuic://${uuid}:${password}@${relay_ip}:${relay_port}?"
-            [ -n "$sni" ] && new_link+="sni=${sni}&"
-            [ -n "$alpn" ] && new_link+="alpn=${alpn}&"
-            [ -n "$cc" ] && new_link+="congestion_control=${cc}&"
-            new_link="${new_link%&}#Relay-${orig_host}"
-            echo "$new_link"
+            local link="tuic://${p[1]}:${p[2]}@${relay_ip}:${relay_port}?"
+            [ -n "${p[5]}" ] && link+="sni=${p[5]}&"
+            [ -n "${p[6]}" ] && link+="alpn=${p[6]}&"
+            [ -n "${p[7]}" ] && link+="congestion_control=${p[7]}&"
+            link+="allow_insecure=1&"
+            echo "${link%&}#Relay-${p[3]}"
             ;;
         socks)
-            local user="${parts[1]}"
-            local pass="${parts[2]}"
-            local orig_host="${parts[3]}"
-            
-            if [ -n "$user" ]; then
-                local auth=$(echo -n "${user}:${pass}" | base64 -w0)
-                echo "socks://${auth}@${relay_ip}:${relay_port}#Relay-${orig_host}"
+            if [ -n "${p[1]}" ]; then
+                local auth=$(echo -n "${p[1]}:${p[2]}" | base64 -w 0 2>/dev/null || echo -n "${p[1]}:${p[2]}" | base64 | tr -d '\n')
+                echo "socks://${auth}@${relay_ip}:${relay_port}#Relay-${p[3]}"
             else
-                echo "socks://${relay_ip}:${relay_port}#Relay-${orig_host}"
-            fi
-            ;;
-        http)
-            local user="${parts[1]}"
-            local pass="${parts[2]}"
-            local orig_host="${parts[3]}"
-            
-            if [ -n "$user" ]; then
-                echo "http://${user}:${pass}@${relay_ip}:${relay_port}#Relay-${orig_host}"
-            else
-                echo "http://${relay_ip}:${relay_port}#Relay-${orig_host}"
+                echo "socks://${relay_ip}:${relay_port}#Relay-${p[3]}"
             fi
             ;;
     esac
 }
 
-# ==================== GOST v3 配置生成 ====================
-generate_gost3_tcp_udp() {
-    local listen_port="$1"
-    local target_host="$2"
-    local target_port="$3"
+# ==================== GOST 安装 ====================
+install_gost() {
+    init_dirs
+    check_system
     
-    cat << EOF
-  - name: relay-${listen_port}-tcp
-    addr: ":${listen_port}"
-    handler:
-      type: tcp
-    listener:
-      type: tcp
-    forwarder:
-      nodes:
-        - name: target
-          addr: "${target_host}:${target_port}"
-  - name: relay-${listen_port}-udp
-    addr: ":${listen_port}"
+    echo -e "${Info} 正在下载 GOST v3..."
+    
+    local url="https://github.com/go-gost/gost/releases/download/v${gost_version}/gost_${gost_version}_linux_${ARCH}.tar.gz"
+    
+    cd /tmp
+    
+    if command -v wget &>/dev/null; then
+        wget -q "$url" -O gost.tar.gz
+    elif command -v curl &>/dev/null; then
+        curl -sL "$url" -o gost.tar.gz
+    else
+        echo -e "${Error} 请安装 wget 或 curl"
+        return 1
+    fi
+    
+    tar -xzf gost.tar.gz
+    mv gost "$GOST_BIN"
+    chmod +x "$GOST_BIN"
+    rm -f gost.tar.gz
+    
+    # 初始化配置
+    cat > "$GOST_CONF" << 'EOF'
+services: []
+EOF
+    
+    # 创建 systemd 服务
+    cat > "$SERVICE_FILE" << EOF
+[Unit]
+Description=GOST v3 Proxy Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=$GOST_BIN -C $GOST_CONF
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    systemctl daemon-reload
+    systemctl enable gost >/dev/null 2>&1
+    
+    echo -e "${Info} GOST v3 安装完成"
+    echo -e "${Info} 安装路径: $GOST_BIN"
+    echo -e "${Info} 配置文件: $GOST_CONF"
+}
+
+# ==================== GOST 配置生成 ====================
+generate_gost_config() {
+    local port="$1"
+    local host="$2"
+    local dport="$3"
+    local proto="${4:-tcp}"
+    
+    if [ "$proto" == "udp" ]; then
+        cat << EOF
+  - name: relay-${port}-udp
+    addr: ":${port}"
     handler:
       type: udp
     listener:
@@ -1215,625 +502,345 @@ generate_gost3_tcp_udp() {
     forwarder:
       nodes:
         - name: target
-          addr: "${target_host}:${target_port}"
-EOF
-}
-
-add_gost3_relay() {
-    local listen_port="$1"
-    local target_host="$2"
-    local target_port="$3"
-    
-    mkdir -p /etc/gost3
-    
-    local new_config=$(generate_gost3_tcp_udp "$listen_port" "$target_host" "$target_port")
-    
-    # 检查配置文件是否只有 services: []
-    if grep -q "^services: \[\]$" $gost_conf_path 2>/dev/null; then
-        cat > $gost_conf_path << EOF
-services:
-${new_config}
+          addr: "${host}:${dport}"
 EOF
     else
-        # 如果文件不存在或为空
-        if [ ! -s "$gost_conf_path" ]; then
-            cat > $gost_conf_path << EOF
+        cat << EOF
+  - name: relay-${port}-tcp
+    addr: ":${port}"
+    handler:
+      type: tcp
+    listener:
+      type: tcp
+    forwarder:
+      nodes:
+        - name: target
+          addr: "${host}:${dport}"
+EOF
+    fi
+}
+
+add_relay() {
+    local port="$1"
+    local host="$2"
+    local dport="$3"
+    local proto="${4:-tcp}"
+    
+    local config=$(generate_gost_config "$port" "$host" "$dport" "$proto")
+    
+    if grep -q "^services: \[\]$" "$GOST_CONF" 2>/dev/null; then
+        cat > "$GOST_CONF" << EOF
 services:
-${new_config}
+${config}
 EOF
-        else
-            echo "$new_config" >> $gost_conf_path
-        fi
+    else
+        echo "$config" >> "$GOST_CONF"
     fi
     
-    echo "gost3|tcp+udp|${listen_port}|${target_host}|${target_port}" >> $raw_conf_path
+    echo "gost|${proto}|${port}|${host}|${dport}" >> "$RAW_CONF"
 }
 
-# ==================== Xray 任意门配置 ====================
-add_xray_dokodemo() {
-    local listen_port="$1"
-    local target_host="$2"
-    local target_port="$3"
-    local network="${4:-tcp,udp}"
-    
-    mkdir -p /etc/gost3
-    
-    local tag="dokodemo-${listen_port}"
-    
-    # 如果配置文件不存在，创建初始配置
-    if [ ! -f "$xray_conf_path" ]; then
-        cat > $xray_conf_path << 'EOF'
-{
-    "log": {"loglevel": "warning"},
-    "inbounds": [],
-    "outbounds": [{"protocol": "freedom", "tag": "direct"}],
-    "routing": {"rules": []}
-}
-EOF
+# ==================== GOST 进程管理 ====================
+start_gost() {
+    if [ ! -f "$GOST_BIN" ]; then
+        echo -e "${Error} GOST 未安装，请先安装"
+        return 1
     fi
     
-    # 使用 jq 添加新的 inbound
-    local temp_file=$(mktemp)
-    jq ".inbounds += [{\"tag\": \"${tag}\", \"port\": ${listen_port}, \"protocol\": \"dokodemo-door\", \"settings\": {\"address\": \"${target_host}\", \"port\": ${target_port}, \"network\": \"${network}\"}}]" $xray_conf_path > "$temp_file"
-    mv "$temp_file" $xray_conf_path
-    
-    echo "xray|dokodemo|${listen_port}|${target_host}|${target_port}|${network}" >> $raw_conf_path
+    systemctl start gost
+    sleep 1
+    if systemctl is-active gost >/dev/null 2>&1; then
+        echo -e "${Info} GOST 启动成功"
+    else
+        echo -e "${Error} GOST 启动失败"
+        journalctl -u gost --no-pager -n 20
+    fi
 }
 
-# ==================== 添加中转配置 ====================
+stop_gost() {
+    systemctl stop gost
+    echo -e "${Info} GOST 已停止"
+}
+
+restart_gost() {
+    systemctl restart gost
+    sleep 1
+    if systemctl is-active gost >/dev/null 2>&1; then
+        echo -e "${Info} GOST 重启成功"
+    else
+        echo -e "${Error} GOST 重启失败"
+    fi
+}
+
+status_gost() {
+    if systemctl is-active gost >/dev/null 2>&1; then
+        echo -e "${Green}运行中${Reset}"
+        return 0
+    else
+        echo -e "${Red}已停止${Reset}"
+        return 1
+    fi
+}
+
+# ==================== 日志管理 ====================
+show_log() {
+    echo -e ""
+    echo -e "${Green}========== 日志 ==========${Reset}"
+    journalctl -u gost --no-pager -n 50
+    echo -e "${Green}==========================${Reset}"
+}
+
+# ==================== 添加中转 ====================
 add_relay_config() {
     echo -e ""
-    echo -e "${Info} 请选择中转方式:"
-    echo -e "-----------------------------------"
-    echo -e "[1] GOST v3 TCP+UDP 中转"
-    echo -e "[2] Xray 任意门 (dokodemo-door)"
-    echo -e "-----------------------------------"
-    read -p "请选择 [默认1]: " relay_type
-    relay_type=${relay_type:-1}
-    
-    # Check and Install Service First
-    if [ "$relay_type" == "1" ]; then
-        if [ ! -f "/usr/bin/gost3" ]; then
-            echo -e "${Warning} GOST v3 未安装，是否立即安装? [Y/n]"
-            read -p "" install_confirm
-            if [[ ! $install_confirm =~ ^[Nn]$ ]]; then
-                install_gost3
-            else
-                return 1
-            fi
-        fi
-    else
-        if ! command -v xray &> /dev/null; then
-            echo -e "${Warning} Xray 未安装，是否立即安装? [Y/n]"
-            read -p "" install_confirm
-            if [[ ! $install_confirm =~ ^[Nn]$ ]]; then
-                install_xray
-            else
-                return 1
-            fi
-        fi
-    fi
-
-    echo -e ""
     echo -e "${Info} 请选择配置方式:"
-    echo -e "-----------------------------------"
     echo -e "[1] 粘贴节点链接 (自动解析)"
-    echo -e "[2] 手动输入目标地址和端口"
-    echo -e "-----------------------------------"
+    echo -e "[2] 手动输入目标地址"
     read -p "请选择 [默认1]: " input_type
     input_type=${input_type:-1}
     
-    local node_links=()
-    local target_host=""
-    local target_port=""
-    local protocol=""
-    local parsed=""
+    local proto="" parsed="" port_type="tcp"
     
     if [ "$input_type" == "1" ]; then
         echo -e ""
-        echo -e "${Info} 请粘贴节点链接 (支持批量多行粘贴): "
+        echo -e "${Info} 请粘贴节点链接 (支持多行粘贴):"
         
-        # Read multiline input with sufficient timeout
+        # 读取多行输入
         local raw_input=""
         read -r first_line
         raw_input="$first_line"
-        # Increased timeout to 1s to ensure all pasted lines are captured
         while read -r -t 1 line; do
-            [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
+            [ -n "$line" ] && raw_input="${raw_input}"$'\n'"$line"
         done
         
-        # 使用正则一次性提取所有链接（显式白名单，确保兼容性并排除中文）
-        # 字符类包括：字母数字、unreserved (-._~)、reserved (:/?#[]@!$&'()*+,;=)、百分号 (%)
-        # 注意：在 [] 中，] 需放首位，- 放末位
+        # 提取链接
         local regex="(vless|vmess|trojan|ss|hysteria2|hy2|tuic|socks|socks5|http|https)://[][a-zA-Z0-9._~:/?#@!$&'()*+,;=%-]+"
+        local node_links=()
         while IFS= read -r -d '' link; do
-            # 再次清理可能残留的非URL字符
-            link=$(echo "$link" | tr -cd '[:print:]')
             node_links+=("$link")
         done < <(echo "$raw_input" | grep -oE "$regex" | tr '\n' '\0')
         
         if [ ${#node_links[@]} -eq 0 ]; then
-            echo -e "${Error} 节点链接不能为空"
+            echo -e "${Error} 未找到有效链接"
             return 1
         fi
         
         echo -e "${Info} 共获取到 ${#node_links[@]} 个链接"
-        # 如果是多个链接，自动启用批量模式（随机端口）
+        
+        # 如果多个链接，自动使用随机端口
+        local auto_batch=false
         if [ ${#node_links[@]} -gt 1 ]; then
-            echo -e "${Info} 检测到多个链接，将自动使用随机端口分配"
-            port_mode=1 
-            # 设置一个标志位，用于稍后跳过 read_port_config 的交互
-            auto_batch_mode=true
-        else
-            auto_batch_mode=false
+            echo -e "${Info} 检测到多个链接，将自动使用随机端口"
+            auto_batch=true
         fi
+        
+        # 获取本机IP
+        local my_ip=$(curl -s4m5 ip.sb 2>/dev/null || curl -s4m5 ifconfig.me 2>/dev/null)
+        [ -z "$my_ip" ] && my_ip="YOUR_IP"
+        
+        local index=1
+        for node_link in "${node_links[@]}"; do
+            echo -e ""
+            echo -e "${Green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Reset}"
+            echo -e "  ${Cyan}处理链接 #${index}/${#node_links[@]}${Reset}"
+            echo -e "${Green}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Reset}"
+            
+            proto=$(detect_protocol "$node_link")
+            if [ "$proto" == "unknown" ]; then
+                echo -e "${Warning} 无法识别的协议，跳过"
+                ((index++))
+                continue
+            fi
+            
+            echo -e "${Info} 协议: ${Green}${proto^^}${Reset}"
+            
+            port_type=$(detect_protocol_type "$proto")
+            parsed=$(parse_node "$node_link")
+            local target=$(get_target "$proto" "$parsed")
+            IFS='|' read -r target_host target_port <<< "$target"
+            
+            if [ -z "$target_host" ] || [ -z "$target_port" ]; then
+                echo -e "${Warning} 解析失败，跳过"
+                ((index++))
+                continue
+            fi
+            
+            echo -e "${Info} 目标: ${Green}${target_host}:${target_port}${Reset}"
+            
+            # 端口配置
+            if [ "$auto_batch" == "true" ]; then
+                local_port=$(get_random_port 10000 65535)
+                local retry=0
+                while ! check_port $local_port && [ $retry -lt 20 ]; do
+                    local_port=$(get_random_port 10000 65535)
+                    ((retry++))
+                done
+                echo -e "${Info} 分配端口: ${Green}$local_port${Reset}"
+                open_port "$local_port"
+                echo "$local_port" >> "$PORT_CONF"
+            else
+                if ! read_port_config; then
+                    ((index++))
+                    continue
+                fi
+            fi
+            
+            add_relay "$local_port" "$target_host" "$target_port" "$port_type"
+            
+            echo -e ""
+            echo -e "${Info} 配置完成: :${local_port} -> ${target_host}:${target_port}"
+            
+            # 生成中转链接
+            local relay_link=$(generate_relay_link "$proto" "$parsed" "$my_ip" "$local_port")
+            echo -e ""
+            echo -e "${Info} 中转后的链接:"
+            echo -e "${Cyan}${relay_link}${Reset}"
+            
+            ((index++))
+        done
+        
+        restart_gost
+        
     else
-        read -p "请输入目标地址 (IP或域名): " target_host
-        read -p "请输入目标端口: " target_port
+        read -p "目标地址: " target_host
+        read -p "目标端口: " target_port
         
         if [ -z "$target_host" ] || [ -z "$target_port" ]; then
             echo -e "${Error} 目标地址和端口不能为空"
             return 1
         fi
         
-        # Tag for manual mode
-        node_links+=("MANUAL_MODE")
-    fi
-    
-    # Get Local IP
-    local local_ip=$(get_ip)
-    if [ -z "$local_ip" ]; then
-        echo -e "${Warning} 无法获取本机公网IP，请稍后手动替换链接中的IP"
-        local_ip="YOUR_IP"
-    fi
-    
-    local process_count=1
-    
-    for link_item in "${node_links[@]}"; do
-        if [ "$input_type" == "1" ]; then
-            echo -e ""
-            echo -e "${Info} [${process_count}/${#node_links[@]}] 正在处理..."
-            local node_link="$link_item"
-            
-            protocol=$(detect_protocol "$node_link")
-            if [ "$protocol" == "unknown" ]; then
-                echo -e "${Error} 无法识别的协议类型: ${node_link:0:30}..."
-                ((process_count++))
-                continue
-            fi
-            
-            echo -e "${Info} 检测到协议: ${Green_font_prefix}${protocol^^}${Font_color_suffix}"
-            
-            parsed=$(parse_node_link "$node_link")
-            local target_info=$(get_target_from_parsed "$protocol" "$parsed")
-            IFS='|' read -r target_host target_port <<< "$target_info"
-            
-            if [ -z "$target_host" ] || [ -z "$target_port" ]; then
-                echo -e "${Error} 解析节点链接失败"
-                ((process_count++))
-                continue
-            fi
-            
-            echo -e "${Info} 目标地址: ${Green_font_prefix}${target_host}:${target_port}${Font_color_suffix}"
-        else
-            echo -e "${Info} 正在处理手动配置..."
+        if ! read_port_config; then
+            return 1
         fi
         
-        # Configure Port
-        # 如果是自动批量模式，直接使用随机端口逻辑，不调用 read_port_config
-        if [ "$auto_batch_mode" == "true" ]; then
-            local_port=$(get_random_port 10000 65535)
-            local retry=0
-            while ! check_port_available $local_port && [ $retry -lt 10 ]; do
-                local_port=$(get_random_port 10000 65535)
-                ((retry++))
-            done
-            echo -e "${Info} 随机分配端口: ${Green_font_prefix}$local_port${Font_color_suffix}"
-            
-            # 开放端口防火墙
-            open_port "$local_port"
-            mkdir -p /etc/gost3
-            echo "$local_port" >> $port_conf_path
-        else
-            if ! read_port_config; then
-                echo -e "${Warning} 跳过当前配置"
-                ((process_count++))
-                continue
-            fi
-        fi
+        local my_ip=$(curl -s4m5 ip.sb 2>/dev/null || curl -s4m5 ifconfig.me 2>/dev/null)
+        [ -z "$my_ip" ] && my_ip="YOUR_IP"
         
-        if [ "$relay_type" == "1" ]; then
-            add_gost3_relay "$local_port" "$target_host" "$target_port"
-            echo -e "${Info} GOST v3 中转配置已添加"
-        else
-            add_xray_dokodemo "$local_port" "$target_host" "$target_port"
-            echo -e "${Info} Xray 任意门配置已添加"
-        fi
+        add_relay "$local_port" "$target_host" "$target_port"
+        restart_gost
         
         echo -e ""
-        echo -e "${Green_font_prefix}===========================================${Font_color_suffix}"
+        echo -e "${Green}===========================================${Reset}"
         echo -e "${Info} 中转配置完成!"
-        echo -e "${Green_font_prefix}===========================================${Font_color_suffix}"
-        echo -e " 本机IP:      ${Cyan_font_prefix}${local_ip}${Font_color_suffix}"
-        echo -e " 本地端口:    ${Cyan_font_prefix}${local_port}${Font_color_suffix}"
-        echo -e " 目标地址:    ${target_host}:${target_port}"
-        echo -e "${Green_font_prefix}===========================================${Font_color_suffix}"
-        
-        # Generate new link if applicable
-        if [ "$input_type" == "1" ] && [ -n "$parsed" ]; then
-            local relay_link=$(generate_relay_link "$protocol" "$parsed" "$local_ip" "$local_port")
-            echo -e ""
-            echo -e "${Info} 中转后的节点链接:"
-            echo -e "${Green_font_prefix}-------------------------------------------${Font_color_suffix}"
-            echo -e "${Cyan_font_prefix}${relay_link}${Font_color_suffix}"
-            echo -e "${Green_font_prefix}-------------------------------------------${Font_color_suffix}"
-        fi
-        
-        ((process_count++))
-    done
-    
-    # Restart Services
-    if [ "$relay_type" == "1" ]; then
-        systemctl restart gost3
-    else
-        systemctl restart xray
+        echo -e "${Green}===========================================${Reset}"
+        echo -e " 本机IP:    ${Cyan}${my_ip}${Reset}"
+        echo -e " 本地端口:  ${Cyan}${local_port}${Reset}"
+        echo -e " 目标地址:  ${target_host}:${target_port}"
+        echo -e "${Green}===========================================${Reset}"
     fi
-    
-    echo -e ""
-    read -p "按回车键继续..."
-}
-
-# ==================== 批量添加中转 ====================
-batch_add_relay() {
-    echo -e ""
-    echo -e "${Info} 批量添加中转配置"
-    echo -e "${Tip} 请输入节点链接，每行一个，输入空行结束"
-    echo -e "-----------------------------------"
-    
-    local links=()
-    while true; do
-        read -p "> " line
-        if [ -z "$line" ]; then
-            break
-        fi
-        links+=("$line")
-    done
-    
-    if [ ${#links[@]} -eq 0 ]; then
-        echo -e "${Error} 没有输入任何链接"
-        return 1
-    fi
-    
-    echo -e ""
-    echo -e "${Info} 请选择中转方式:"
-    echo -e "[1] GOST v3  [2] Xray 任意门"
-    read -p "请选择 [默认1]: " relay_type
-    relay_type=${relay_type:-1}
-    
-    echo -e ""
-    echo -e "${Info} 端口分配方式:"
-    echo -e "[1] 从指定端口开始递增  [2] 随机分配"
-    read -p "请选择 [默认1]: " port_mode
-    port_mode=${port_mode:-1}
-    
-    local start_port=10000
-    if [ "$port_mode" == "1" ]; then
-        read -p "请输入起始端口 [默认10000]: " start_port
-        start_port=${start_port:-10000}
-    fi
-    
-    local local_ip=$(get_ip)
-    local current_port=$start_port
-    
-    echo -e ""
-    echo -e "${Info} 开始批量添加..."
-    echo -e ""
-    
-    for link in "${links[@]}"; do
-        local protocol=$(detect_protocol "$link")
-        if [ "$protocol" == "unknown" ]; then
-            echo -e "${Warning} 跳过无法识别的链接: ${link:0:50}..."
-            continue
-        fi
-        
-        local parsed=$(parse_node_link "$link")
-        local target_info=$(get_target_from_parsed "$protocol" "$parsed")
-        IFS='|' read -r target_host target_port <<< "$target_info"
-        
-        if [ -z "$target_host" ] || [ -z "$target_port" ]; then
-            echo -e "${Warning} 跳过解析失败的链接"
-            continue
-        fi
-        
-        # 获取可用端口
-        if [ "$port_mode" == "1" ]; then
-            while ! check_port_available $current_port; do
-                ((current_port++))
-            done
-            local_port=$current_port
-            ((current_port++))
-        else
-            local_port=$(get_random_port 10000 65535)
-            while ! check_port_available $local_port; do
-                local_port=$(get_random_port 10000 65535)
-            done
-        fi
-        
-        echo "$local_port" >> $port_conf_path
-        
-        if [ "$relay_type" == "1" ]; then
-            add_gost3_relay "$local_port" "$target_host" "$target_port"
-        else
-            add_xray_dokodemo "$local_port" "$target_host" "$target_port"
-        fi
-        
-        local relay_link=$(generate_relay_link "$protocol" "$parsed" "$local_ip" "$local_port")
-        echo -e "${Info} [$protocol] ${target_host}:${target_port} -> :${local_port}"
-        echo -e "    ${Cyan_font_prefix}${relay_link}${Font_color_suffix}"
-        echo -e ""
-    done
-    
-    if [ "$relay_type" == "1" ]; then
-        systemctl restart gost3
-    else
-        systemctl restart xray
-    fi
-    
-    echo -e "${Info} 批量添加完成!"
-    read -p "按回车键继续..."
 }
 
 # ==================== 查看配置 ====================
-show_all_config() {
+show_config() {
     echo -e ""
-    echo -e "${Green_font_prefix}==================== 当前中转配置 ====================${Font_color_suffix}"
+    echo -e "${Green}==================== 当前配置 ====================${Reset}"
     
-    if [ ! -f "$raw_conf_path" ] || [ ! -s "$raw_conf_path" ]; then
+    if [ ! -f "$RAW_CONF" ] || [ ! -s "$RAW_CONF" ]; then
         echo -e "${Warning} 暂无配置"
-        echo -e "${Green_font_prefix}=======================================================${Font_color_suffix}"
         return
     fi
     
-    printf "%-4s | %-12s | %-8s | %s\n" "序号" "类型" "本地端口" "目标地址"
-    echo -e "-------------------------------------------------------"
+    printf "%-4s | %-6s | %-8s | %s\n" "序号" "类型" "本地端口" "目标地址"
+    echo "------------------------------------------------"
     
     local i=1
-    while IFS= read -r line; do
-        if [ -n "$line" ]; then
-            IFS='|' read -ra parts <<< "$line"
-            local type="${parts[0]}-${parts[1]}"
-            local port="${parts[2]}"
-            local host="${parts[3]}"
-            local dport="${parts[4]}"
-            printf "%-4s | %-12s | %-8s | %s\n" "$i" "$type" "$port" "$host:$dport"
-            ((i++))
-        fi
-    done < $raw_conf_path
+    while IFS='|' read -r type proto port host dport; do
+        printf "%-4s | %-6s | %-8s | %s\n" "$i" "${proto^^}" "$port" "$host:$dport"
+        ((i++))
+    done < "$RAW_CONF"
     
-    echo -e "${Green_font_prefix}=======================================================${Font_color_suffix}"
+    echo -e "${Green}==================================================${Reset}"
 }
 
 # ==================== 删除配置 ====================
 delete_config() {
-    show_all_config
+    show_config
     
-    if [ ! -f "$raw_conf_path" ] || [ ! -s "$raw_conf_path" ]; then
+    if [ ! -s "$RAW_CONF" ]; then
         return
     fi
     
-    echo -e ""
-    read -p "请输入要删除的配置序号 (输入 0 取消): " del_num
+    read -p "删除序号 (0取消): " num
+    [ "$num" == "0" ] && return
     
-    if [ "$del_num" == "0" ]; then
+    if ! [[ "$num" =~ ^[0-9]+$ ]]; then
+        echo -e "${Error} 无效输入"
         return
     fi
     
-    if ! [[ "$del_num" =~ ^[0-9]+$ ]]; then
-        echo -e "${Error} 请输入有效数字"
-        return
-    fi
-    
-    local line=$(sed -n "${del_num}p" $raw_conf_path)
+    local line=$(sed -n "${num}p" "$RAW_CONF")
     if [ -z "$line" ]; then
         echo -e "${Error} 配置不存在"
         return
     fi
     
-    IFS='|' read -ra parts <<< "$line"
-    local service_type="${parts[0]}"
-    local local_port="${parts[2]}"
+    IFS='|' read -ra p <<< "$line"
+    local port="${p[2]}"
     
-    # 从原始配置文件删除
-    sed -i "${del_num}d" $raw_conf_path
+    sed -i "${num}d" "$RAW_CONF"
+    sed -i "/^${port}$/d" "$PORT_CONF"
     
-    # 从端口配置删除
-    sed -i "/^${local_port}$/d" $port_conf_path 2>/dev/null
-    
-    # 重新生成配置
-    if [ "$service_type" == "gost3" ]; then
-        cat > $gost_conf_path << 'EOF'
+    # 重建配置
+    cat > "$GOST_CONF" << 'EOF'
 services: []
 EOF
-        while IFS= read -r conf_line; do
-            if [[ "$conf_line" == gost3* ]]; then
-                IFS='|' read -ra p <<< "$conf_line"
-                local new_config=$(generate_gost3_tcp_udp "${p[2]}" "${p[3]}" "${p[4]}")
-                if grep -q "^services: \[\]$" $gost_conf_path; then
-                    cat > $gost_conf_path << EOF
+    
+    while IFS='|' read -r type proto port host dport; do
+        local config=$(generate_gost_config "$port" "$host" "$dport" "$proto")
+        if grep -q "^services: \[\]$" "$GOST_CONF"; then
+            cat > "$GOST_CONF" << EOF
 services:
-${new_config}
+${config}
 EOF
-                else
-                    echo "$new_config" >> $gost_conf_path
-                fi
-            fi
-        done < $raw_conf_path
-        systemctl restart gost3
-    else
-        cat > $xray_conf_path << 'EOF'
-{
-    "log": {"loglevel": "warning"},
-    "inbounds": [],
-    "outbounds": [{"protocol": "freedom", "tag": "direct"}],
-    "routing": {"rules": []}
-}
-EOF
-        while IFS= read -r conf_line; do
-            if [[ "$conf_line" == xray* ]]; then
-                IFS='|' read -ra p <<< "$conf_line"
-                add_xray_dokodemo "${p[2]}" "${p[3]}" "${p[4]}" "${p[5]}"
-            fi
-        done < $raw_conf_path
-        systemctl restart xray
-    fi
-    
-    echo -e "${Info} 配置已删除"
-}
-
-# ==================== 服务状态 ====================
-show_status() {
-    echo -e ""
-    echo -e "${Green_font_prefix}==================== 服务状态 ====================${Font_color_suffix}"
-    
-    # GOST 状态
-    if [ -f "/usr/bin/gost3" ]; then
-        local gost_status=$(systemctl is-active gost3 2>/dev/null)
-        if [ "$gost_status" == "active" ]; then
-            echo -e " GOST v3:  ${Green_font_prefix}运行中${Font_color_suffix}"
         else
-            echo -e " GOST v3:  ${Red_font_prefix}已停止${Font_color_suffix}"
+            echo "$config" >> "$GOST_CONF"
         fi
-    else
-        echo -e " GOST v3:  ${Yellow_font_prefix}未安装${Font_color_suffix}"
-    fi
+    done < "$RAW_CONF"
     
-    # Xray 状态
-    if command -v xray &> /dev/null; then
-        local xray_status=$(systemctl is-active xray 2>/dev/null)
-        if [ "$xray_status" == "active" ]; then
-            echo -e " Xray:     ${Green_font_prefix}运行中${Font_color_suffix}"
-        else
-            echo -e " Xray:     ${Red_font_prefix}已停止${Font_color_suffix}"
-        fi
-    else
-        echo -e " Xray:     ${Yellow_font_prefix}未安装${Font_color_suffix}"
-    fi
-    
-    # 配置数量
-    local config_count=0
-    if [ -f "$raw_conf_path" ]; then
-        config_count=$(wc -l < $raw_conf_path 2>/dev/null || echo 0)
-    fi
-    echo -e " 中转数量: ${Cyan_font_prefix}${config_count}${Font_color_suffix}"
-    
-    # 本机IP
-    local ip=$(get_ip)
-    echo -e " 本机IP:   ${Cyan_font_prefix}${ip:-获取中...}${Font_color_suffix}"
-    
-    echo -e "${Green_font_prefix}==================================================${Font_color_suffix}"
-}
-
-# ==================== 解析测试 ====================
-test_parse() {
-    echo -e ""
-    echo -e "${Info} 请粘贴节点链接 (支持批量多行粘贴): "
-    
-    # Read multiline input with sufficient timeout
-    local test_links=()
-    local raw_input=""
-    read -r first_line
-    raw_input="$first_line"
-    while read -r -t 1 line; do
-        [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
-    done
-    
-    # 使用正则一次性提取所有链接（显式白名单）
-    local regex="(vless|vmess|trojan|ss|hysteria2|hy2|tuic|socks|socks5|http|https)://[][a-zA-Z0-9._~:/?#@!$&'()*+,;=%-]+"
-    
-    while IFS= read -r -d '' link; do
-        test_links+=("$link")
-    done < <(echo "$raw_input" | grep -oE "$regex" | tr '\n' '\0')
-    
-    if [ ${#test_links[@]} -eq 0 ]; then
-        echo -e "${Error} 链接不能为空"
-        return
-    fi
-    
-    echo -e "${Info} 共获取到 ${#test_links[@]} 个链接"
-    echo -e ""
-    
-    local index=1
-    for test_link in "${test_links[@]}"; do
-        # 美化的分隔线和标题
-        echo -e "${Green_font_prefix}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Font_color_suffix}"
-        
-        local protocol=$(detect_protocol "$test_link")
-        echo -e "  ${Cyan_font_prefix}节点 #${index} - ${protocol^^}${Font_color_suffix}"
-        echo -e "${Green_font_prefix}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Font_color_suffix}"
-        echo -e ""
-        
-        if [ "$protocol" == "unknown" ]; then
-            echo -e "${Error} 无法识别的协议"
-            echo -e ""
-            ((index++))
-            continue
-        fi
-        
-        local parsed=$(parse_node_link "$test_link")
-        
-        # 使用格式化显示
-        format_parsed_result "$protocol" "$parsed"
-        
-        # 显示目标地址
-        local target_info=$(get_target_from_parsed "$protocol" "$parsed")
-        IFS='|' read -r target_host target_port <<< "$target_info"
-        echo -e ""
-        echo -e "${Green_font_prefix}✅ 目标地址: ${target_host}:${target_port}${Font_color_suffix}"
-        
-        # 节点信息替换
-        local new_parsed=$(replace_node_info "$protocol" "$parsed")
-        if [ $? -eq 0 ]; then
-            # 重建链接
-            local new_link=$(rebuild_link "$protocol" "$new_parsed")
-            echo -e ""
-            echo -e "${Green_font_prefix}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Font_color_suffix}"
-            echo -e "${Cyan_font_prefix}📋 新链接已生成:${Font_color_suffix}"
-            echo -e "${Green_font_prefix}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Font_color_suffix}"
-            echo -e "${Yellow_font_prefix}${new_link}${Font_color_suffix}"
-            echo -e "${Green_font_prefix}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${Font_color_suffix}"
-        fi
-        
-        echo -e ""
-        ((index++))
-    done
-    
-    read -p "按回车键继续..."
+    restart_gost
+    echo -e "${Info} 已删除"
 }
 
 # ==================== 卸载 ====================
-uninstall_gost3() {
-    echo -e "${Warning} 确定要卸载 GOST v3 吗? [y/N]"
+uninstall() {
+    echo -e "${Warning} 确定卸载? [y/N]"
     read -p "" confirm
-    if [[ ! $confirm =~ ^[Yy]$ ]]; then
-        return
-    fi
+    [[ ! $confirm =~ ^[Yy]$ ]] && return
     
-    systemctl stop gost3 2>/dev/null
-    systemctl disable gost3 2>/dev/null
-    rm -rf /usr/bin/gost3 /etc/gost3 /etc/systemd/system/gost3.service
+    systemctl stop gost 2>/dev/null
+    systemctl disable gost 2>/dev/null
+    rm -f "$SERVICE_FILE"
+    rm -f "$GOST_BIN"
+    rm -rf "$GOST_DIR"
     systemctl daemon-reload
-    echo -e "${Info} GOST v3 已卸载"
+    
+    echo -e "${Info} 已卸载"
 }
 
-uninstall_xray() {
-    echo -e "${Warning} 确定要卸载 Xray 吗? [y/N]"
-    read -p "" confirm
-    if [[ ! $confirm =~ ^[Yy]$ ]]; then
-        return
-    fi
+# ==================== 快捷命令 ====================
+install_shortcut() {
+    local current_script=$(readlink -f "$0")
+    cp "$current_script" /usr/local/bin/gost
+    chmod +x /usr/local/bin/gost
+    echo -e "${Info} 快捷命令安装完成！"
+    echo -e "${Tip} 现在可以直接输入 ${Green}gost${Reset} 进入管理菜单"
+}
+
+# ==================== 状态显示 ====================
+show_status() {
+    echo -e ""
+    echo -e "${Green}==================== 状态 ====================${Reset}"
+    echo -n " GOST: "
+    status_gost
     
-    bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove --purge
-    echo -e "${Info} Xray 已卸载"
+    local count=0
+    [ -f "$RAW_CONF" ] && count=$(wc -l < "$RAW_CONF" | tr -d ' ')
+    echo -e " 中转数: ${Cyan}${count}${Reset}"
+    
+    local ip=$(curl -s4m3 ip.sb 2>/dev/null)
+    echo -e " IP: ${Cyan}${ip:-获取中...}${Reset}"
+    echo -e "${Green}================================================${Reset}"
 }
 
 # ==================== 主菜单 ====================
@@ -1842,62 +849,56 @@ show_menu() {
     show_status
     
     echo -e "
-${Green_font_prefix}========================================================${Font_color_suffix}
-      GOST v3 + Xray 任意门 中转管理脚本 ${Red_font_prefix}[v${shell_version}]${Font_color_suffix}
-${Green_font_prefix}========================================================${Font_color_suffix}
- ${Cyan_font_prefix}支持: VLESS VMess Trojan SS Hy2 TUIC SOCKS HTTP${Font_color_suffix}
-${Green_font_prefix}--------------------------------------------------------${Font_color_suffix}
- ${Green_font_prefix}1.${Font_color_suffix}  安装 GOST v3          ${Green_font_prefix}2.${Font_color_suffix}  安装 Xray
- ${Green_font_prefix}3.${Font_color_suffix}  卸载 GOST v3          ${Green_font_prefix}4.${Font_color_suffix}  卸载 Xray
-${Green_font_prefix}--------------------------------------------------------${Font_color_suffix}
- ${Green_font_prefix}5.${Font_color_suffix}  启动 GOST v3          ${Green_font_prefix}6.${Font_color_suffix}  停止 GOST v3
- ${Green_font_prefix}7.${Font_color_suffix}  重启 GOST v3          ${Green_font_prefix}8.${Font_color_suffix}  查看日志
-${Green_font_prefix}--------------------------------------------------------${Font_color_suffix}
- ${Green_font_prefix}9.${Font_color_suffix}  启动 Xray             ${Green_font_prefix}10.${Font_color_suffix} 停止 Xray
- ${Green_font_prefix}11.${Font_color_suffix} 重启 Xray             ${Green_font_prefix}12.${Font_color_suffix} 查看日志
-${Green_font_prefix}--------------------------------------------------------${Font_color_suffix}
- ${Green_font_prefix}13.${Font_color_suffix} 添加中转配置          ${Green_font_prefix}14.${Font_color_suffix} 批量添加中转
- ${Green_font_prefix}15.${Font_color_suffix} 查看当前配置          ${Green_font_prefix}16.${Font_color_suffix} 删除配置
-${Green_font_prefix}--------------------------------------------------------${Font_color_suffix}
- ${Green_font_prefix}17.${Font_color_suffix} 解析节点链接 (测试)   ${Green_font_prefix}18.${Font_color_suffix} 安装快捷命令
-${Green_font_prefix}--------------------------------------------------------${Font_color_suffix}
- ${Green_font_prefix}0.${Font_color_suffix}  退出脚本
-${Green_font_prefix}========================================================${Font_color_suffix}
+${Green}========================================================${Reset}
+   GOST v3 中转脚本 - 普通 VPS 版 ${Red}[${shell_version}]${Reset}
+${Green}========================================================${Reset}
+ ${Cyan}支持: VLESS VMess Trojan SS Hy2 TUIC Reality${Reset}
+${Green}--------------------------------------------------------${Reset}
+ ${Green}1.${Reset}  安装 GOST v3
+ ${Green}2.${Reset}  卸载 GOST v3
+${Green}--------------------------------------------------------${Reset}
+ ${Green}3.${Reset}  启动 GOST
+ ${Green}4.${Reset}  停止 GOST
+ ${Green}5.${Reset}  重启 GOST
+ ${Green}6.${Reset}  查看日志
+${Green}--------------------------------------------------------${Reset}
+ ${Green}7.${Reset}  添加中转配置
+ ${Green}8.${Reset}  查看当前配置
+ ${Green}9.${Reset}  删除配置
+${Green}--------------------------------------------------------${Reset}
+ ${Green}10.${Reset} 安装快捷命令 (gost)
+${Green}--------------------------------------------------------${Reset}
+ ${Green}0.${Reset}  退出
+${Green}========================================================${Reset}
 "
-    read -p " 请输入数字 [0-18]: " num
+    read -p " 请选择 [0-10]: " num
     
     case "$num" in
-        1) install_gost3 ;;
-        2) install_xray ;;
-        3) uninstall_gost3 ;;
-        4) uninstall_xray ;;
-        5) systemctl start gost3 && echo -e "${Info} GOST v3 已启动" ;;
-        6) systemctl stop gost3 && echo -e "${Info} GOST v3 已停止" ;;
-        7) systemctl restart gost3 && echo -e "${Info} GOST v3 已重启" ;;
-        8) journalctl -u gost3 -n 50 --no-pager ;;
-        9) systemctl start xray && echo -e "${Info} Xray 已启动" ;;
-        10) systemctl stop xray && echo -e "${Info} Xray 已停止" ;;
-        11) systemctl restart xray && echo -e "${Info} Xray 已重启" ;;
-        12) journalctl -u xray -n 50 --no-pager ;;
-        13) add_relay_config ;;
-        14) batch_add_relay ;;
-        15) show_all_config; read -p "按回车键继续..." ;;
-        16) delete_config ;;
-        17) test_parse ;;
-        18) install_shortcut ;;
         0) exit 0 ;;
-        *) echo -e "${Error} 请输入正确数字 [0-18]" ;;
+        1) install_gost ;;
+        2) uninstall ;;
+        3) start_gost ;;
+        4) stop_gost ;;
+        5) restart_gost ;;
+        6) show_log ;;
+        7) add_relay_config ;;
+        8) show_config ;;
+        9) delete_config ;;
+        10) install_shortcut ;;
+        *) echo -e "${Error} 无效选择" ;;
     esac
+    
+    echo -e ""
+    read -p "按回车继续..."
 }
 
-# ==================== 启动脚本 ====================
+# ==================== 主程序 ====================
 main() {
     check_root
-    check_sys
+    init_dirs
     
     while true; do
         show_menu
-        echo -e ""
     done
 }
 
