@@ -946,12 +946,42 @@ add_relay_config() {
         echo -e "${Info} 请粘贴节点链接 (支持批量多行粘贴): "
         
         # Read multiline input with sufficient timeout
-        read -r first_link
-        [ -n "$first_link" ] && node_links+=("$first_link")
-        # Increased timeout to 0.5s to ensure all pasted lines are captured
-        while read -r -t 0.5 line; do
-            [ -n "$line" ] && node_links+=("$line")
+        local raw_input=""
+        read -r first_line
+        raw_input="$first_line"
+        # Increased timeout to 1s to ensure all pasted lines are captured
+        while read -r -t 1 line; do
+            [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
         done
+        
+        # 处理输入：按行分割，同时处理可能在一行中的多个链接
+        # 支持的协议前缀
+        local protocols="vless://|vmess://|trojan://|ss://|hysteria2://|hy2://|tuic://|socks://|socks5://|http://|https://"
+        
+        # 先按换行分割，再检查每行是否有多个链接
+        while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            # 清理回车符
+            line=$(echo "$line" | tr -d '\r')
+            
+            # 检查一行中是否有多个协议前缀（即多个链接粘贴在一起）
+            # 使用 grep 统计协议前缀数量
+            local prefix_count=$(echo "$line" | grep -oE "$protocols" | wc -l)
+            
+            if [ "$prefix_count" -gt 1 ]; then
+                # 一行中有多个链接，需要分割
+                # 在每个协议前缀前添加换行符，然后再次按行处理
+                local split_line=$(echo "$line" | sed -E "s/(${protocols})/\n\1/g")
+                while IFS= read -r sub_link; do
+                    sub_link=$(echo "$sub_link" | xargs)
+                    [ -n "$sub_link" ] && node_links+=("$sub_link")
+                done <<< "$split_line"
+            else
+                # 单个链接
+                line=$(echo "$line" | xargs)
+                [ -n "$line" ] && node_links+=("$line")
+            fi
+        done <<< "$raw_input"
         
         if [ ${#node_links[@]} -eq 0 ]; then
             echo -e "${Error} 节点链接不能为空"
@@ -1316,11 +1346,33 @@ test_parse() {
     
     # Read multiline input with sufficient timeout
     local test_links=()
-    read -r first_link
-    [ -n "$first_link" ] && test_links+=("$first_link")
-    while read -r -t 0.5 line; do
-        [ -n "$line" ] && test_links+=("$line")
+    local raw_input=""
+    read -r first_line
+    raw_input="$first_line"
+    while read -r -t 1 line; do
+        [ -n "$line" ] && raw_input="$raw_input"$'\n'"$line"
     done
+    
+    # 处理输入：按行分割，同时处理可能在一行中的多个链接
+    local protocols="vless://|vmess://|trojan://|ss://|hysteria2://|hy2://|tuic://|socks://|socks5://|http://|https://"
+    
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        line=$(echo "$line" | tr -d '\r')
+        
+        local prefix_count=$(echo "$line" | grep -oE "$protocols" | wc -l)
+        
+        if [ "$prefix_count" -gt 1 ]; then
+            local split_line=$(echo "$line" | sed -E "s/(${protocols})/\n\1/g")
+            while IFS= read -r sub_link; do
+                sub_link=$(echo "$sub_link" | xargs)
+                [ -n "$sub_link" ] && test_links+=("$sub_link")
+            done <<< "$split_line"
+        else
+            line=$(echo "$line" | xargs)
+            [ -n "$line" ] && test_links+=("$line")
+        fi
+    done <<< "$raw_input"
     
     if [ ${#test_links[@]} -eq 0 ]; then
         echo -e "${Error} 链接不能为空"
